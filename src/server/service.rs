@@ -85,3 +85,7 @@ fn set_service_status(status_handle: &ServiceStatusHandle, current_state: Servic
         }
     }
 }
+
+pub fn running_as_service() -> bool {
+    ! unsafe { GetStdHandle(STD_ERROR_HANDLE) }.is_ok()
+}

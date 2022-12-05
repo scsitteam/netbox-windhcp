@@ -1,14 +1,19 @@
+mod shared;
+mod config;
+mod interval;
+mod signal;
+mod sync;
+mod web;
+mod webhook;
+#[cfg(windows)]
 pub mod service;
 
-use std::sync::mpsc as std_mpsc;
-use log::debug;
-use tokio::sync::mpsc;
-use warp::Filter;
+use std::sync::{mpsc as std_mpsc, Arc};
+use tokio::sync::{broadcast, Mutex};
 
-#[derive(Debug)]
-pub enum Message {
-    Shutdown,
-}
+use crate::server::{config::WebhookConfig, shared::ServerStatus};
+
+use self::shared::{Message, SharedServerStatus};
 
 pub fn run(shutdown_rx: Option<std_mpsc::Receiver<Message>>) {
     tokio::runtime::Builder::new_multi_thread()
@@ -16,33 +21,37 @@ pub fn run(shutdown_rx: Option<std_mpsc::Receiver<Message>>) {
         .build()
         .unwrap()
         .block_on(async {
-            
-            let (shutdown_tx, mut shutdown_rx2) = mpsc::channel(32);
 
+            let status: SharedServerStatus = Arc::new(Mutex::new(ServerStatus::new()));
+            let config = WebhookConfig {
+                listen: "127.0.0.1:12345".parse().unwrap(),
+                sync_command: vec![String::from("sleep"), String::from("5")],
+                sync_interval: Some(30),
+                sync_standoff_time: Some(5),
+                sync_timeout: Some(10),
+            };
+            let (message_tx, mut message_rx) = broadcast::channel(16);
+
+            let _interval_handle = self::interval::spawn(&config, &status, &message_tx);
+            let _signal_handle = self::signal::spawn(&message_tx);
+
+            dbg!(shutdown_rx);
+/*
             if let Some(shutdown_rx) = shutdown_rx {
                 debug!("Start Proxy");
                 tokio::spawn(async move {
-                    loop {
-                        let msg = match shutdown_rx.recv() {
-                            Ok(msg) => msg,
-                            Err(_) => { break; },
-                        };
+                    while let Ok(msg) = shutdown_rx.recv() {
                         debug!("Channel proxy got: {:?}", &msg);
                         shutdown_tx.send(msg).await.unwrap();
                     };
                 });
                 debug!("Start Proxy Done");
             }
+*/
+            tokio::join!(
+                self::web::server(&config, &status, &message_tx),
+                self::sync::worker(&config, &status, message_rx)
+            );
 
-            let hello = warp::path!("hello" / String)
-                .map(|name| format!("Hello, {}!", name));
-
-            let (_addr, server) = warp::serve(hello)
-                .bind_with_graceful_shutdown(([127, 0, 0, 1], 3030), async move {
-                    shutdown_rx2.recv().await;
-               });
-            server.await;
-        
-        println!("Hello world");
     })
 }
