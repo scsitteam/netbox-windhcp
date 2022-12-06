@@ -1,6 +1,7 @@
 use std::{ffi::OsString, time::Duration};
 
 use log::{debug, error, info};
+use windows::Win32::System::Console::{GetStdHandle, STD_ERROR_HANDLE};
 use std::sync::mpsc;
 use windows_service::{
     define_windows_service,
@@ -87,5 +88,5 @@ fn set_service_status(status_handle: &ServiceStatusHandle, current_state: Servic
 }
 
 pub fn running_as_service() -> bool {
-    ! unsafe { GetStdHandle(STD_ERROR_HANDLE) }.is_ok()
+    unsafe { GetStdHandle(STD_ERROR_HANDLE) }.is_err()
 }
