@@ -10,7 +10,7 @@ use super::{
 pub fn spawn(config: &WebhookConfig, status: &SharedServerStatus, sync_tx: &broadcast::Sender<Message>) -> JoinHandle<()> {
     let status = status.clone();
     let sync_tx = sync_tx.clone();
-    let interval = chrono::Duration::seconds(config.sync_interval.unwrap_or(3600));
+    let interval = config.sync_interval();
 
     tokio::spawn(async move {
         loop {

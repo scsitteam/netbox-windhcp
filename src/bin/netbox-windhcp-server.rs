@@ -1,8 +1,15 @@
-use netbox_windhcp_sync::logging;
-use netbox_windhcp_sync::server;
+use netbox_windhcp_sync::{server, Config};
 
 fn main() {
-    let _log_handle = logging::init("server");
+    let config = match Config::load_from_file() {
+        Ok(config) => config,
+        Err(e) => {
+            println!("Error reading config: {}", e);
+            return;
+        }
+    };
+
+    config.log.setup("server");
 
     #[cfg(windows)]
     let service = server::service::running_as_service();

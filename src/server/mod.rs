@@ -12,11 +12,20 @@ use std::sync::{mpsc as std_mpsc, Arc};
 use log::debug;
 use tokio::sync::{broadcast, Mutex};
 
-use crate::server::{config::WebhookConfig, shared::ServerStatus};
+use crate::{server::{config::WebhookConfig, shared::ServerStatus}, Config};
 
 use self::shared::{Message, SharedServerStatus};
 
 pub fn run(shutdown_rx: Option<std_mpsc::Receiver<Message>>) {
+
+    let config = match Config::load_from_file() {
+        Ok(config) => config.webhook,
+        Err(e) => {
+            println!("Error reading config: {}", e);
+            return;
+        }
+    };
+
     tokio::runtime::Builder::new_multi_thread()
         .enable_all()
         .build()
@@ -24,13 +33,6 @@ pub fn run(shutdown_rx: Option<std_mpsc::Receiver<Message>>) {
         .block_on(async {
 
             let status: SharedServerStatus = Arc::new(Mutex::new(ServerStatus::new()));
-            let config = WebhookConfig {
-                listen: "127.0.0.1:12345".parse().unwrap(),
-                sync_command: vec![String::from("sleep"), String::from("5")],
-                sync_interval: Some(30),
-                sync_standoff_time: Some(5),
-                sync_timeout: Some(10),
-            };
             let (message_tx, mut message_rx) = broadcast::channel(16);
 
             let _interval_handle = self::interval::spawn(&config, &status, &message_tx);
@@ -50,7 +52,7 @@ pub fn run(shutdown_rx: Option<std_mpsc::Receiver<Message>>) {
 
             tokio::join!(
                 self::web::server(&config, &status, &message_tx),
-                self::sync::worker(&config, &status, message_rx)
+                self::sync::worker(&config, &status, &message_tx, message_rx)
             );
 
     })

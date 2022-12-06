@@ -1,4 +1,4 @@
-use std::time::Duration;
+use std::{time::Duration, env::{self, consts::EXE_SUFFIX}, path::PathBuf, error::Error};
 
 use chrono::Utc;
 use log::{info, debug, error};
@@ -6,11 +6,30 @@ use tokio::{sync::broadcast::{self, error::RecvError}, time::{sleep, error::Elap
 
 use super::{config::WebhookConfig, shared::{SharedServerStatus, Message}};
 
-pub async fn worker(config: &WebhookConfig, status: &SharedServerStatus, mut message_rx: broadcast::Receiver<Message>) {
+fn get_sync_binary() -> Result<PathBuf, Box<dyn Error>> {
+    let sync_exe = env::current_exe()?
+        .parent().ok_or(SyncError::CommandNotFound)?
+        .join(format!("netbox-windhcp-sync2{}", EXE_SUFFIX));
+    if ! sync_exe.is_file() {
+        error!("Sync binary at {} not found.", sync_exe.display());
+        return Err(Box::new(SyncError::CommandNotFound));
+    }
+    Ok(sync_exe)
+}
+
+pub async fn worker(config: &WebhookConfig, status: &SharedServerStatus, message_tx: &broadcast::Sender<Message>, mut message_rx: broadcast::Receiver<Message>) {
     let status: SharedServerStatus = status.clone();
-    let sync_command = config.sync_command.clone();
-    let sync_standoff_time = Duration::from_secs(config.sync_standoff_time.unwrap_or(5));
-    let sync_timeout = Duration::from_secs(config.sync_timeout.unwrap_or(60));
+    let sync_standoff_time = config.sync_standoff_time();
+    let sync_timeout = config.sync_timeout();
+    
+    let sync_command = match get_sync_binary() {
+        Ok(bin) => bin,
+        Err(e) => {
+            error!("Sync binary not found. {}", e);
+            message_tx.send(Message::Shutdown).unwrap();
+            return;
+        }
+    };
 
     debug!("Sync Runner Thread Started");
     loop {
@@ -62,11 +81,14 @@ pub async fn worker(config: &WebhookConfig, status: &SharedServerStatus, mut mes
 
 #[derive(Debug)]
 enum SyncError {
+    CommandNotFound,
     IoError(std::io::Error),
     Timeout(Elapsed),
     CommandStatus(i32),
     CommandNoStatus,
 }
+
+impl Error for SyncError {}
 impl From<std::io::Error> for SyncError {
     fn from(e: std::io::Error) -> Self {
         SyncError::IoError(e)
@@ -75,6 +97,7 @@ impl From<std::io::Error> for SyncError {
 impl std::fmt::Display for SyncError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
+            SyncError::CommandNotFound => write!(f, "Sync binary not found"),
             SyncError::IoError(e) => write!(f, "Process io::Error {:?}", e),
             SyncError::Timeout(_) => write!(f, "Process timed out."),
             SyncError::CommandStatus(s) => write!(f, "Process exited with status code {}", s),
@@ -83,10 +106,9 @@ impl std::fmt::Display for SyncError {
     }
 }
 
-async fn run_sync_command(command: &Vec<String>, timeout: &Duration) -> Result<(), SyncError> {
-    info!("Run Sync Command: {}", command.join(" "));
-    let mut child = Command::new(&command[0])
-        .args(&command[1..])
+async fn run_sync_command(command: &PathBuf, timeout: &Duration) -> Result<(), SyncError> {
+    info!("Run Sync Command: {}", &command.display());
+    let mut child = Command::new(&command)
         .spawn()?;
 
     let status = match tokio::time::timeout(timeout.to_owned(), child.wait()).await {
