@@ -1,10 +1,10 @@
 use log::LevelFilter;
 use log4rs::{append::{console::ConsoleAppender, file::FileAppender}, config::{Appender, Root}, Config, Handle};
 
-pub fn init() -> Handle {
+pub fn init(name: &str) -> Handle {
     let stdout = ConsoleAppender::builder().build();
     let logfile = FileAppender::builder()
-        .build("C:\\ProgramData\\netbox-windhcp-sync\\server.log")
+        .build(format!("C:\\ProgramData\\netbox-windhcp-sync\\{}.log", name))
         .unwrap();
 
     let config = Config::builder()

@@ -1,10 +1,5 @@
 use serde::Deserialize;
 
-#[derive(Debug, Deserialize)]
-pub struct Config {
-    pub webhook: WebhookConfig,
-}
-
 #[derive(Debug, Deserialize, Clone)]
 pub struct WebhookConfig {
     pub listen: std::net::SocketAddr,
@@ -20,9 +15,9 @@ mod tests {
 
     #[test]
     fn it_works() {
-        let cfg = serde_yaml::from_str::<Config>(r#"---
-        webhook:
-            listen: 127.0.0.1:12345
+        let cfg = serde_yaml::from_str::<WebhookConfig>(r#"---
+        listen: 127.0.0.1:12345
+        sync_command: ["sleep", "5"]
         "#);
         dbg!(&cfg);
         assert!(cfg.is_ok());

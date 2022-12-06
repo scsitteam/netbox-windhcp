@@ -1,5 +1,5 @@
 mod shared;
-mod config;
+pub mod config;
 mod interval;
 mod signal;
 mod sync;
