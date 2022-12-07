@@ -57,14 +57,31 @@ pub async fn server(config: &WebhookConfig, status: &SharedServerStatus, message
     }).with(warp::log(module_path!()));
 
     let message_clone = message_tx.clone();
-    let (_addr, server) = warp::serve(route)
-        .bind_with_graceful_shutdown(config.listen, async move {
-            let mut message_rx = message_clone.subscribe();
-            while let Ok(msg) = message_rx.recv().await {
-                if msg == Message::Shutdown {
-                    break;
+
+    if config.enable_tls() {
+        let (_addr, server) = warp::serve(route)
+            .tls()
+            .cert_path("cert.pem")
+            .key_path("key.rsa")
+            .bind_with_graceful_shutdown(config.listen, async move {
+                let mut message_rx = message_clone.subscribe();
+                while let Ok(msg) = message_rx.recv().await {
+                    if msg == Message::Shutdown {
+                        break;
+                    }
                 }
-            }
-        });
-    server.await
+            });
+        server.await
+    } else {
+        let (_addr, server) = warp::serve(route)
+            .bind_with_graceful_shutdown(config.listen, async move {
+                let mut message_rx = message_clone.subscribe();
+                while let Ok(msg) = message_rx.recv().await {
+                    if msg == Message::Shutdown {
+                        break;
+                    }
+                }
+            });
+        server.await
+    }
 }
