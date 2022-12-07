@@ -707,7 +707,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "netbox-windhcp-sync"
+name = "netbox-windhcp"
 version = "0.1.0"
 dependencies = [
  "chrono",

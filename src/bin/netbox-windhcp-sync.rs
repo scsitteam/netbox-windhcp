@@ -1,5 +1,5 @@
 use log::warn;
-use netbox_windhcp_sync::Config;
+use netbox_windhcp::Config;
 
 fn main() {
     let config = match Config::load_from_file() {
