@@ -1,5 +1,5 @@
 [package]
-name = "netbox-windhcp-sync"
+name = "netbox-windhcp"
 version = "0.1.0"
 edition = "2021"
 
@@ -7,15 +7,17 @@ edition = "2021"
 
 [dependencies]
 chrono = { version = "0.4.23", features = ["serde"] }
+ipnet = { version = "2.5.1", features = ["serde"] }
 log = { version = "0.4.17", features = ["serde"] }
 log4rs = "1.2.0"
-reqwest = "0.11.13"
+num = "0.4.0"
+reqwest = { version = "0.11.13", features = ["json"] }
 serde = { version = "1.0.149", features = ["derive"] }
 serde_json = "1.0.89"
 serde_yaml = "0.9.14"
 tokio = { version = "1.22.0", features = ["rt", "macros", "rt-multi-thread", "signal", "process"] }
 warp = "0.3.3"
-windows = { version = "0.43.0", features = ["Win32_System_Console", "Win32_Foundation"] }
+windows = { version = "0.43.0", features = ["Win32_System_Console", "Win32_Foundation", "Win32_NetworkManagement_Dhcp"] }
 windows-service = "0.5.0"
 
 [dev-dependencies]
