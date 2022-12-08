@@ -1,7 +1,8 @@
-use log::warn;
-use netbox_windhcp_sync::Config;
+use log::error;
+use netbox_windhcp::{Config, Sync};
 
-fn main() {
+#[tokio::main]
+async fn main() {
     let config = match Config::load_from_file() {
         Ok(config) => config,
         Err(e) => {
@@ -11,6 +12,9 @@ fn main() {
     };
 
     config.log.setup("sync");
-
-    warn!("Config: {:?}", config);
+    
+    match Sync::new(config.sync, true).run().await {
+        Ok(_) => {},
+        Err(e) => error!("{}", e),
+    }
 }

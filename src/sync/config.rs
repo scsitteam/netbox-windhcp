@@ -2,19 +2,27 @@ use std::collections::HashMap;
 
 use serde::Deserialize;
 
+use super::windhcp::DnsFlags;
+
 #[derive(Debug, Deserialize, Clone)]
 pub struct SyncConfig {
     pub netbox: SyncNetboxConfig,
     pub dhcp: SyncDhcpConfig,
 }
 
+impl SyncConfig {
+    pub fn netbox(&self) -> &SyncNetboxConfig {
+        &self.netbox
+    }
+}
+
 #[derive(Debug, Deserialize, Clone)]
 pub struct SyncNetboxConfig {
-    apiurl: String,
-    token: String,
-    prefix_filter: HashMap<String, String>,
-    range_filter: HashMap<String, String>,
-    reservation_filter: HashMap<String, String>,
+    pub(super) apiurl: String,
+    pub(super) token: String,
+    pub(super) prefix_filter: HashMap<String, String>,
+    pub(super) range_filter: HashMap<String, String>,
+    pub(super) reservation_filter: HashMap<String, String>,
 }
 
 impl SyncNetboxConfig {
@@ -43,6 +51,8 @@ impl SyncNetboxConfig {
 pub struct SyncDhcpConfig {
     server: String,
     lease_duration: Option<u32>,
+    #[serde(default)]
+    default_dns_flags: DnsFlags,
 }
 
 impl SyncDhcpConfig {
@@ -52,6 +62,10 @@ impl SyncDhcpConfig {
 
     pub fn lease_duration(&self) -> u32 {
         self.lease_duration.unwrap_or(7 * 24 * 60 * 60)
+    }
+
+    pub fn default_dns_flags(&self) -> &DnsFlags {
+        &self.default_dns_flags
     }
 }
 
@@ -85,6 +99,10 @@ mod tests {
         let cfg = serde_yaml::from_str::<SyncDhcpConfig>(r#"---
         server: dhcp.example.com
         lease_duration: 3600
+        default_dns_flags:
+            enabled: true
+            cleanup_expired: true
+            update_dhcid: true
         "#);
         assert!(cfg.is_ok());
         let cfg = cfg.unwrap();
@@ -97,6 +115,7 @@ mod tests {
         let cfg = serde_yaml::from_str::<SyncDhcpConfig>(r#"---
         server: dhcp.example.com
         "#);
+        dbg!(&cfg);
         assert!(cfg.is_ok());
         let cfg = cfg.unwrap();
         assert_eq!(cfg.server(), "dhcp.example.com");
