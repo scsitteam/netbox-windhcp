@@ -115,7 +115,7 @@ impl Sync {
 
         /* Lease Duration */
         let lease_duration = prefix.custom_fields.dhcp_lease_duration
-            .unwrap_or(self.config.dhcp.lease_duration());
+            .unwrap_or_else(|| self.config.dhcp.lease_duration());
         if lease_duration != subnet.get_lease_duration()? {
             if !self.noop { subnet.set_lease_duration(lease_duration)?; }
             info!("  Subnet {}: Updated lead duration to {}", &subnetaddress, lease_duration);
@@ -178,7 +178,7 @@ impl Sync {
     }
 
     async fn get_macaddress_for_reservation_from_assigned_object(&self, object: Option<&IpAddressAssignedObject>) -> Result<Option<String>, Box<dyn std::error::Error + Send + std::marker::Sync>> {
-        let url = match object.map_or(None, |o| o.url().cloned()) {
+        let url = match object.and_then(|o| o.url().cloned()) {
             Some(url) => url,
             None => return Ok(None),
         };

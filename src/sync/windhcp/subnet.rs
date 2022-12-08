@@ -26,12 +26,10 @@ impl Subnet {
     }
 
     fn set_subnet_info(&self, subnetinfo: DHCP_SUBNET_INFO) -> Result<(), u32> {
-        let ret = match unsafe { DhcpSetSubnetInfo(&self.serveripaddress, self.subnetaddress, &subnetinfo) } {
+        match unsafe { DhcpSetSubnetInfo(&self.serveripaddress, self.subnetaddress, &subnetinfo) } {
             0 => Ok(()),
             n => Err(n),
-        };
-
-        ret
+        }
     }
 
     fn get_elements(&self, enumelementtype: DHCP_SUBNET_ELEMENT_TYPE) -> Result<Option<DHCP_SUBNET_ELEMENT_INFO_ARRAY_V5>, u32> {
@@ -54,7 +52,7 @@ impl Subnet {
                 n => { return Err(n); },
         }
 
-        let data: DHCP_SUBNET_ELEMENT_INFO_ARRAY_V5 = unsafe {*enumelementinfo}.clone();
+        let data: DHCP_SUBNET_ELEMENT_INFO_ARRAY_V5 = unsafe {*enumelementinfo};
 
         unsafe { DhcpRpcFreeMemory(enumelementinfo as *mut c_void); };
 
@@ -162,8 +160,9 @@ impl Subnet {
             0 => Ok(()),
             n => Err(n),
         };
-        
-        //unsafe { DhcpRpcFreeMemory(optionvalue as *mut c_void) };
+
+        unsafe { DhcpRpcFreeMemory((*optionvalue).Value.Elements as *mut c_void) };
+        unsafe { DhcpRpcFreeMemory(optionvalue as *mut c_void) };
 
         ret
     }
@@ -315,7 +314,7 @@ impl Subnet {
 
             let vec_len = unsafe{(*reservation.ReservedForClient).DataLength} as usize;
 
-            ret.insert(Ipv4Addr::from(reservation.ReservedIpAddress), unsafe { Vec::from_raw_parts((*reservation.ReservedForClient).Data.clone(), vec_len, vec_len)[5..].to_vec().clone() });
+            ret.insert(Ipv4Addr::from(reservation.ReservedIpAddress), unsafe { Vec::from_raw_parts((*reservation.ReservedForClient).Data, vec_len, vec_len)[5..].to_vec().clone() });
         }
         unsafe { DhcpRpcFreeMemory(reservations.Elements as *mut c_void); };
         

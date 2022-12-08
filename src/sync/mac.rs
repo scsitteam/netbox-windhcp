@@ -4,7 +4,7 @@ pub trait MacAddr<T> {
 }
 impl<T: std::fmt::UpperHex + num::Num + Default> MacAddr<T> for Vec<T> {
     fn as_mac(&self) -> String {
-        self.into_iter().map(|d| format!("{:02X}", d)).collect::<Vec<String>>().join(":")
+        self.iter().map(|d| format!("{:02X}", d)).collect::<Vec<String>>().join(":")
     }
 
     fn from_mac(mac: &str) -> Vec<T> {
