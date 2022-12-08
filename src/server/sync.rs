@@ -9,7 +9,7 @@ use super::{config::WebhookConfig, shared::{SharedServerStatus, Message}};
 fn get_sync_binary() -> Result<PathBuf, Box<dyn Error>> {
     let sync_exe = env::current_exe()?
         .parent().ok_or(SyncError::CommandNotFound)?
-        .join(format!("netbox-windhcp-sync2{}", EXE_SUFFIX));
+        .join(format!("netbox-windhcp-sync{}", EXE_SUFFIX));
     if ! sync_exe.is_file() {
         error!("Sync binary at {} not found.", sync_exe.display());
         return Err(Box::new(SyncError::CommandNotFound));
