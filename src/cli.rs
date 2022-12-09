@@ -1,6 +1,5 @@
 use clap::Parser;
 
-
 /// Netbxo to Windows DHCP Syncer
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]

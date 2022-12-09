@@ -1,4 +1,4 @@
-use netbox_windhcp_sync::{server, Config};
+use netbox_windhcp::{server, Config};
 
 fn main() {
     let config = match Config::load_from_file() {

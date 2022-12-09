@@ -7,6 +7,7 @@ edition = "2021"
 
 [dependencies]
 chrono = { version = "0.4.23", features = ["serde"] }
+clap = { version = "4.0.29", features = ["derive"] }
 ipnet = { version = "2.5.1", features = ["serde"] }
 log = { version = "0.4.17", features = ["serde"] }
 log4rs = "1.2.0"
@@ -19,6 +20,7 @@ tokio = { version = "1.22.0", features = ["rt", "macros", "rt-multi-thread", "si
 warp = "0.3.3"
 windows = { version = "0.43.0", features = ["Win32_System_Console", "Win32_Foundation", "Win32_NetworkManagement_Dhcp"] }
 windows-service = "0.5.0"
+windy = "0.2.0"
 
 [dev-dependencies]
 libc = "0.2.138"
