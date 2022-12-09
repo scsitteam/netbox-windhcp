@@ -7,7 +7,7 @@ pub fn spawn(sync_tx: &broadcast::Sender<Message>) -> JoinHandle<()> {
     let sync_tx = sync_tx.clone();
 
     tokio::spawn(async move {
-        while let Ok(_) = signal::ctrl_c().await {
+        while (signal::ctrl_c().await).is_ok() {
             info!("Received Ctrl+C send Shutdown message.");
             match sync_tx.send(Message::Shutdown) {
                 Ok(_) => {},

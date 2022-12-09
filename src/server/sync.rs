@@ -1,8 +1,8 @@
-use std::{time::Duration, env::{self, consts::EXE_SUFFIX}, path::PathBuf, error::Error};
+use std::{time::Duration, env::{self, consts::EXE_SUFFIX}, path::PathBuf, error::Error, process::Stdio};
 
 use chrono::Utc;
 use log::{info, debug, error};
-use tokio::{sync::broadcast::{self, error::RecvError}, time::{sleep, error::Elapsed}, process::Command};
+use tokio::{sync::broadcast::{self, error::RecvError}, time::{sleep, error::Elapsed, Instant}, process::Command};
 
 use super::{config::WebhookConfig, shared::{SharedServerStatus, Message}};
 
@@ -50,11 +50,13 @@ pub async fn worker(config: &WebhookConfig, status: &SharedServerStatus, message
                     status.syncing = true;
                 }
 
+                
+                let sync_start = Instant::now();
                 let sync_status = run_sync_command(&sync_command, &sync_timeout).await;
 
                 match sync_status {
                     Ok(_) => {
-                        info!("Sync succeeded");
+                        info!("Sync succeeded ({}s)", sync_start.elapsed().as_secs());
                         {
                             let mut status = status.lock().await;
                             status.syncing = false;
@@ -108,7 +110,10 @@ impl std::fmt::Display for SyncError {
 
 async fn run_sync_command(command: &PathBuf, timeout: &Duration) -> Result<(), SyncError> {
     info!("Run Sync Command: {}", &command.display());
-    let mut child = Command::new(&command)
+    let mut child = Command::new(command)
+        .stdin(Stdio::null())
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
         .spawn()?;
 
     let status = match tokio::time::timeout(timeout.to_owned(), child.wait()).await {

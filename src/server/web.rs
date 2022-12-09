@@ -33,7 +33,7 @@ pub async fn server(config: &WebhookConfig, status: &SharedServerStatus, message
     let status_filter = warp::any().map(move || status_clone.clone());
     let message_clone = message_tx.clone();
     let message_filter = warp::any().map(move || message_clone.clone());
-    let secret_clone = config.secret().map(String::to_owned).clone();
+    let secret_clone = config.secret().map(String::to_owned);
     let webhook_route = warp::post()
         .and(warp::path("webhook")).and(warp::path::end())
         .and(warp::body::content_length_limit(1024 * 32))
@@ -95,7 +95,7 @@ use sha2::Sha512;
 use hmac::{Hmac, Mac};
 type HmacSha512 = Hmac<Sha512>;
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Eq)]
 pub enum WebErrors {
     MissingSignature,
     BadSecret,
@@ -112,7 +112,6 @@ struct ErrorMessage {
 
 fn netbox_webhook_body(secret: Option<String>) -> impl Filter<Extract = (NetboxWebHook, ), Error = warp::Rejection> + Clone {
 
-    let secret = secret.clone();
     let f = warp::any().map( move || secret.clone());
 
     warp::any()
@@ -140,7 +139,7 @@ fn netbox_webhook_body(secret: Option<String>) -> impl Filter<Extract = (NetboxW
             }
         })
         .and_then(|body: bytes::Bytes| async move {
-            serde_json::from_slice::<NetboxWebHook>(&body).map_err(|e| {
+            serde_json::from_slice::<NetboxWebHook>(&body).map_err(|_| {
                 warp::reject::custom(WebErrors::BadFormat)
             }
         )

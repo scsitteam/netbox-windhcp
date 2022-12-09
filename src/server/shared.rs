@@ -17,7 +17,7 @@ impl ServerStatus {
 
 pub type SharedServerStatus = Arc<Mutex<ServerStatus>>;
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Message {
     Shutdown,
     TriggerSync,

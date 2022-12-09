@@ -1,7 +1,7 @@
 use chrono::{DateTime, Utc};
 use serde::Deserialize;
 
-#[derive(Debug, Deserialize, PartialEq)]
+#[derive(Debug, Deserialize, PartialEq, Eq)]
 pub struct NetboxWebHook {
     pub event: NetboxWebHookEvent,
     pub timestamp: DateTime<Utc>,
@@ -11,7 +11,7 @@ pub struct NetboxWebHook {
     pub data: serde_json::Map<String, serde_json::Value>,
 }
 
-#[derive(Debug, Deserialize, PartialEq)]
+#[derive(Debug, Deserialize, PartialEq, Eq)]
 #[serde(rename_all="lowercase")]
 pub enum NetboxWebHookEvent {
     Created,

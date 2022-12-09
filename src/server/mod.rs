@@ -12,7 +12,7 @@ use std::sync::{mpsc as std_mpsc, Arc};
 use log::debug;
 use tokio::sync::{broadcast, Mutex};
 
-use crate::{server::{config::WebhookConfig, shared::ServerStatus}, Config};
+use crate::{server::shared::ServerStatus, Config};
 
 use self::shared::{Message, SharedServerStatus};
 
@@ -33,7 +33,7 @@ pub fn run(shutdown_rx: Option<std_mpsc::Receiver<Message>>) {
         .block_on(async {
 
             let status: SharedServerStatus = Arc::new(Mutex::new(ServerStatus::new()));
-            let (message_tx, mut message_rx) = broadcast::channel(16);
+            let (message_tx, message_rx) = broadcast::channel(16);
 
             let _interval_handle = self::interval::spawn(&config, &status, &message_tx);
             let _signal_handle = self::signal::spawn(&message_tx);

@@ -2,7 +2,7 @@ use std::{time::Duration, net::SocketAddr};
 
 use serde::Deserialize;
 
-#[derive(Debug, Deserialize, Clone, PartialEq)]
+#[derive(Debug, Deserialize, Clone, PartialEq, Eq)]
 pub struct WebhookConfig {
     pub listen: SocketAddr,
     sync_interval: Option<i64>,
