@@ -81,6 +81,13 @@ impl WinDhcp {
         }
     }
 
+    pub fn remove_subnet(&self, subnetaddress: Ipv4Addr) -> WinDhcpResult<()> {
+        match unsafe { DhcpDeleteSubnet(&self.serveripaddress, u32::from(subnetaddress), DhcpFullForce)} {
+                0 => Ok(()),
+                e => Err(WinDhcpError::new("removing subnet", e)),
+        }
+    }
+
     pub fn get_client_name(&self, clientip: Ipv4Addr) -> Result<String, u32> {
         let mut clientinfo: *mut DHCP_CLIENT_INFO_V4 = ptr::null_mut();
 
@@ -123,7 +130,74 @@ impl WinDhcp {
         }
 
         let mut info = unsafe{ *clientinfo };
-        info.ClientName = PWSTR::from_raw(name.encode_utf16().chain(::std::iter::once(0)).collect::<Vec<u16>>().as_mut_ptr());
+        
+        let mut wname: windy::WString = name.try_into().unwrap();
+        let wptr = wname.as_mut_c_str().as_mut_ptr();
+
+        info.ClientName = PWSTR::from_raw(wptr);
+    
+        let ret = match unsafe { DhcpSetClientInfoV4(&self.serveripaddress, &info)} {
+            0 => Ok(()),
+            e => Err(WinDhcpError::new("setting client name", e)),
+        };
+
+        unsafe { DhcpRpcFreeMemory((*clientinfo).ClientName.as_ptr() as *mut c_void) };
+        unsafe { DhcpRpcFreeMemory((*clientinfo).ClientComment.as_ptr() as *mut c_void) };
+        unsafe { DhcpRpcFreeMemory((*clientinfo).ClientHardwareAddress.Data as *mut c_void) };
+        unsafe { DhcpRpcFreeMemory((*clientinfo).OwnerHost.HostName.as_ptr() as *mut c_void) };
+        unsafe { DhcpRpcFreeMemory((*clientinfo).OwnerHost.NetBiosName.as_ptr() as *mut c_void) };
+        unsafe { DhcpRpcFreeMemory(clientinfo as *mut c_void) };
+
+        ret
+    }
+
+    pub fn get_client_comment(&self, clientip: Ipv4Addr) -> Result<String, u32> {
+        let mut clientinfo: *mut DHCP_CLIENT_INFO_V4 = ptr::null_mut();
+
+        let searchinfo = DHCP_SEARCH_INFO {
+            SearchType: DHCP_SEARCH_INFO_TYPE(0),
+            SearchInfo: DHCP_SEARCH_INFO_0 { ClientIpAddress: u32::from(clientip) },
+        };
+        match unsafe { DhcpGetClientInfoV4(&self.serveripaddress, &searchinfo, &mut clientinfo)} {
+                0 => (),
+                n => { return Err(n); },
+        }
+
+        let info = unsafe{ *clientinfo };
+
+        let name = match info.ClientComment.is_null() {
+            true => String::from(""),
+            false => unsafe{info.ClientComment.to_string()}.unwrap_or_default(),
+        };
+
+        unsafe { DhcpRpcFreeMemory((*clientinfo).ClientName.as_ptr() as *mut c_void) };
+        unsafe { DhcpRpcFreeMemory((*clientinfo).ClientComment.as_ptr() as *mut c_void) };
+        unsafe { DhcpRpcFreeMemory((*clientinfo).ClientHardwareAddress.Data as *mut c_void) };
+        unsafe { DhcpRpcFreeMemory((*clientinfo).OwnerHost.HostName.as_ptr() as *mut c_void) };
+        unsafe { DhcpRpcFreeMemory((*clientinfo).OwnerHost.NetBiosName.as_ptr() as *mut c_void) };
+        unsafe { DhcpRpcFreeMemory(clientinfo as *mut c_void) };
+
+        Ok(name)
+    }
+    
+    pub fn set_client_comment(&self, clientip: Ipv4Addr, comment: &str) -> WinDhcpResult<()>  {
+        let mut clientinfo: *mut DHCP_CLIENT_INFO_V4 = ptr::null_mut();
+
+        let searchinfo = DHCP_SEARCH_INFO {
+            SearchType: DHCP_SEARCH_INFO_TYPE(0),
+            SearchInfo: DHCP_SEARCH_INFO_0 { ClientIpAddress: u32::from(clientip) },
+        };
+        match unsafe { DhcpGetClientInfoV4(&self.serveripaddress, &searchinfo, &mut clientinfo)} {
+                0 => (),
+                e => return Err(WinDhcpError::new("setting client name", e)),
+        }
+
+        let mut info = unsafe{ *clientinfo };
+        
+        let mut wcomment: windy::WString = comment.try_into().unwrap();
+        let wptr = wcomment.as_mut_c_str().as_mut_ptr();
+
+        info.ClientComment = PWSTR::from_raw(wptr);
     
         let ret = match unsafe { DhcpSetClientInfoV4(&self.serveripaddress, &info)} {
             0 => Ok(()),

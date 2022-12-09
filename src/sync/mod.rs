@@ -51,8 +51,7 @@ impl Sync {
                     continue;
                 }
             };
-            
-            let subnet = self.sync_subnetv4(prefix, range).await?;
+            let subnet = self.sync_subnetv4(prefix, range)?;
 
             /* Update Reservations */
             let mut dhcp_reservations = subnet.get_reservations().unwrap();
@@ -76,14 +75,15 @@ impl Sync {
             if prefixes_ip.contains(&subnet) {
                 continue;
             }
-
-            info!("Removed Subnet {}", &subnet);
+            
+            if !self.noop { self.dhcp.remove_subnet(subnet)?; }
+            info!("Subnet {}: Removed", &subnet);
         }
 
         Ok(())
     }
 
-    async fn sync_subnetv4(&self, prefix: &Prefix, range: &IpRange) -> Result<Subnet, Box<dyn std::error::Error + Send + std::marker::Sync>> {
+    fn sync_subnetv4(&self, prefix: &Prefix, range: &IpRange) -> Result<Subnet, Box<dyn std::error::Error + Send + std::marker::Sync>> {
         let subnetaddress = &prefix.addr();
 
         let subnet = self.dhcp.get_or_create_subnet(subnetaddress, &prefix.netmask()).unwrap();
@@ -118,7 +118,7 @@ impl Sync {
             .unwrap_or_else(|| self.config.dhcp.lease_duration());
         if lease_duration != subnet.get_lease_duration()? {
             if !self.noop { subnet.set_lease_duration(lease_duration)?; }
-            info!("  Subnet {}: Updated lead duration to {}", &subnetaddress, lease_duration);
+            info!("  Subnet {}: Updated lease duration to {}", &subnetaddress, lease_duration);
         }
         
         /* DNS Update */
@@ -160,6 +160,13 @@ impl Sync {
         if name != reservation.dns_name() {
             if !self.noop { self.dhcp.set_client_name(reservation.address(), reservation.dns_name())?; }
             info!("  Reservation {}: Set client name to {}", &reservation.address(), &reservation.dns_name());
+        }
+
+        /* Client Comment */
+        let comment = self.dhcp.get_client_comment(reservation.address()).unwrap_or_default();
+        if comment != reservation.description() {
+            if !self.noop { self.dhcp.set_client_comment(reservation.address(), reservation.description())?; }
+            info!("  Reservation {}: Set client comment to {}", &reservation.address(), &reservation.description());
         }
 
         Ok(())

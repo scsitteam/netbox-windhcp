@@ -1,7 +1,8 @@
 use std::{fmt, net::Ipv4Addr, ptr, ffi::c_void, collections::HashMap};
 use serde::Deserialize;
 use windows::{
-    Win32::NetworkManagement::Dhcp::*, core::{HSTRING, PWSTR, PCWSTR},
+    Win32::NetworkManagement::Dhcp::*,
+    core::{HSTRING, PWSTR, PCWSTR},
 };
 
 use super::{WinDhcpError, WinDhcpResult};
@@ -127,44 +128,34 @@ impl Subnet {
     }
 
     fn set_option_u32(&self, optionid: u32, value: u32) -> Result<(), u32> {
-        let mut optionvalue: *mut DHCP_OPTION_VALUE = ptr::null_mut();
-
         let mut scopeinfo = DHCP_OPTION_SCOPE_INFO {
             ScopeType: DhcpSubnetOptions,
             ScopeInfo: DHCP_OPTION_SCOPE_INFO_0 { SubnetScopeInfo: self.subnetaddress },
         };
 
-        match unsafe { DhcpGetOptionValueV5(&self.serveripaddress,
+        let mut value = DHCP_OPTION_DATA_ELEMENT {
+            OptionType: DhcpDWordOption,
+            Element: DHCP_OPTION_DATA_ELEMENT_0 {
+                DWordOption: value
+            },
+        };
+
+        let mut optionvalue = DHCP_OPTION_DATA {
+            NumElements: 1,
+            Elements: &mut value
+        };
+
+        match unsafe { DhcpSetOptionValueV5(&self.serveripaddress,
             0x00,
             optionid,
             PCWSTR::null(),
             PCWSTR::null(),
             &mut scopeinfo,
-            &mut optionvalue) } {
-                0 => (),
-                n => { return Err(n); },
-        }
-
-        unsafe {
-            (*((*optionvalue).Value.Elements)).Element.DWordOption = value;
-        }
-
-        let ret = match unsafe { DhcpSetOptionValueV5(&self.serveripaddress,
-            0x00,
-            optionid,
-            PCWSTR::null(),
-            PCWSTR::null(),
-            &mut scopeinfo,
-            &mut ((*optionvalue).Value)
+            &mut optionvalue,
         ) } {
             0 => Ok(()),
             n => Err(n),
-        };
-
-        unsafe { DhcpRpcFreeMemory((*optionvalue).Value.Elements as *mut c_void) };
-        unsafe { DhcpRpcFreeMemory(optionvalue as *mut c_void) };
-
-        ret
+        }
     }
 
     pub fn get(serveripaddress: &HSTRING, subnetaddress: &Ipv4Addr) -> Result<Option<Self>, u32> {
@@ -173,12 +164,21 @@ impl Subnet {
 
         let ret = match unsafe { DhcpGetSubnetInfo(serveripaddress, subnetaddress, &mut subnetinfo) } {
             0 => {
+                let subnet_name = match unsafe{(*subnetinfo).SubnetName}.is_null() {
+                    true => String::default(),
+                    false => unsafe{(*subnetinfo).SubnetName.to_string()}.unwrap_or_default(),
+                };
+                let subnet_comment = match unsafe{(*subnetinfo).SubnetComment}.is_null() {
+                    true => String::default(),
+                    false => unsafe{(*subnetinfo).SubnetComment.to_string()}.unwrap_or_default(),
+                };
+
                 Ok(Some(Self {
                     serveripaddress: serveripaddress.clone(),
                     subnetaddress,
                     subnet_mask: Ipv4Addr::from(unsafe{*subnetinfo}.SubnetMask),
-                    subnet_name: unsafe{(*subnetinfo).SubnetName.to_string()}.unwrap_or_default(),
-                    subnet_comment: unsafe{(*subnetinfo).SubnetComment.to_string()}.unwrap_or_default(),
+                    subnet_name,
+                    subnet_comment,
                 }))
             },
             ERROR_DHCP_SUBNET_NOT_PRESENT => Ok(None),
@@ -222,23 +222,35 @@ impl Subnet {
     pub fn set_name(&self, name: &str) -> WinDhcpResult<()> {
         let mut subnetinfo = self.get_subnet_info()
             .map_err(|e| WinDhcpError::new("setting subnet name", e))?;
-        subnetinfo.SubnetName = PWSTR::from_raw(name.encode_utf16().chain(::std::iter::once(0)).collect::<Vec<u16>>().as_mut_ptr());
+
+        let mut wname: windy::WString = name.try_into().unwrap();
+        let wptr = wname.as_mut_c_str().as_mut_ptr();
+
+        subnetinfo.SubnetName = PWSTR::from_raw(wptr);
         self.set_subnet_info(subnetinfo)
             .map_err(|e| WinDhcpError::new("setting subnet name", e))
     }
 
-    pub fn set_comment(&self, name: &str) -> WinDhcpResult<()> {
+    pub fn set_comment(&self, comment: &str) -> WinDhcpResult<()> {
         let mut subnetinfo = self.get_subnet_info()
         .map_err(|e| WinDhcpError::new("setting subnet comment", e))?;
-        subnetinfo.SubnetComment = PWSTR::from_raw(name.encode_utf16().chain(::std::iter::once(0)).collect::<Vec<u16>>().as_mut_ptr());
+
+        let mut wcomment: windy::WString = comment.try_into().unwrap();
+        let wptr = wcomment.as_mut_c_str().as_mut_ptr();
+
+        subnetinfo.SubnetComment = PWSTR::from_raw(wptr);
         self.set_subnet_info(subnetinfo)
             .map_err(|e| WinDhcpError::new("setting subnet comment", e))
     }
 
     pub fn get_subnet_range(&self) -> WinDhcpResult<(Ipv4Addr, Ipv4Addr)> {
 
-        let data = self.get_first_element(DhcpIpRangesDhcpBootp)
-            .map_err(|e| WinDhcpError::new("getting subnet range", e))?;
+        let data = match self.get_first_element(DhcpIpRangesDhcpBootp) {
+            Ok(data) => data,
+            //ERROR_NO_MORE_ITEMS
+            Err(259) => { return Ok((Ipv4Addr::from(0), Ipv4Addr::from(0))); },
+            Err(e) => return Err(WinDhcpError::new("getting subnet range", e)),
+        };
 
         let ret = (
             Ipv4Addr::from(unsafe {(*data.Element.IpRange).StartAddress}),
@@ -254,8 +266,25 @@ impl Subnet {
         let start_address = u32::from(start_address);
         let end_address = u32::from(end_address);
 
-        let mut data = self.get_first_element(DhcpIpRangesDhcpBootp)
-            .map_err(|e| WinDhcpError::new("setting subnet range", e))?;
+        let mut data = match self.get_first_element(DhcpIpRangesDhcpBootp) {
+            Ok(data) => data,
+            //ERROR_NO_MORE_ITEMS
+            Err(259) => {
+                let mut ip_range = DHCP_BOOTP_IP_RANGE {
+                    StartAddress: std::u32::MAX,
+                    EndAddress: 0u32,
+                    BootpAllocated: 0u32,
+                    MaxBootpAllowed: 0u32,
+                };
+                DHCP_SUBNET_ELEMENT_DATA_V5 {
+                    ElementType: DhcpIpRangesDhcpBootp,
+                    Element: DHCP_SUBNET_ELEMENT_DATA_V5_0 {
+                        IpRange: &mut ip_range,
+                    },
+                }
+            },
+            Err(e) => return Err(WinDhcpError::new("getting subnet range", e)),
+        };
         
         unsafe {
             (*data.Element.IpRange).StartAddress = std::cmp::min((*data.Element.IpRange).StartAddress, start_address);
@@ -263,7 +292,7 @@ impl Subnet {
         }
 
         self.add_element(&data)
-            .map_err(|e| WinDhcpError::new("setting subnet range", e))?;
+            .map_err(|e| WinDhcpError::new("setting subnet range2", e))?;
         
         unsafe {
             (*data.Element.IpRange).StartAddress = start_address;
@@ -271,7 +300,7 @@ impl Subnet {
         }
 
         self.add_element(&data)
-            .map_err(|e| WinDhcpError::new("setting subnet range", e))?;
+            .map_err(|e| WinDhcpError::new("setting subnet range3", e))?;
 
         //unsafe { DhcpRpcFreeMemory(data as *mut c_void) };
 
@@ -279,8 +308,11 @@ impl Subnet {
     }
 
     pub fn get_lease_duration(&self) -> WinDhcpResult<u32> {
-        self.get_option_u32(OPTION_LEASE_TIME)
-            .map_err(|e| WinDhcpError::new("getting lease duration", e))
+        match self.get_option_u32(OPTION_LEASE_TIME) {
+            Ok(duration) => Ok(duration),
+            Err(2) => Ok(0),
+            Err(e) => Err(WinDhcpError::new("getting lease duration", e)),
+        }
     }
 
     pub fn set_lease_duration(&self, lease_duration: u32) -> WinDhcpResult<()> {

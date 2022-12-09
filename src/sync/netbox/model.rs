@@ -61,6 +61,7 @@ impl IpRange {
 pub struct IpAddress {
     address: Ipv4Net,
     dns_name: String,
+    description: String,
     custom_fields: IpAddressCustomField,
     assigned_object: Option<IpAddressAssignedObject>,
 }
@@ -102,6 +103,10 @@ impl IpAddress {
 
     pub fn dns_name(&self) -> &str {
         self.dns_name.as_ref()
+    }
+
+    pub fn description(&self) -> &str {
+        self.description.as_ref()
     }
 }
 
