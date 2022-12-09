@@ -1,7 +1,7 @@
 use std::path::PathBuf;
 
 use log::LevelFilter;
-use log4rs::{append::{console::ConsoleAppender, file::FileAppender}, config::{Appender, Root}, Config, Handle};
+use log4rs::{append::{console::ConsoleAppender, file::FileAppender}, config::{Appender, Root}, Config, Handle, encode::pattern::PatternEncoder};
 use serde::Deserialize;
 
 #[derive(Debug, Deserialize)]
@@ -18,12 +18,14 @@ impl Default for LogConfig {
 }
 
 impl LogConfig {
-    pub fn setup(self: &Self, name: &str) -> Handle {
+    pub fn setup(&self, name: &str) -> Handle {
         log4rs::init_config(self.as_log4rs_config(name)).unwrap()
     }
 
-    pub(self) fn as_log4rs_config(self: &Self, name: &str) -> Config {
-        let stdout = ConsoleAppender::builder().build();
+    pub(self) fn as_log4rs_config(&self, name: &str) -> Config {
+        let stdout = ConsoleAppender::builder()
+            .encoder(Box::new(PatternEncoder::new("{d(%Y-%m-%d %H:%M:%S)} {h({l})} {t} - {m}{n}")))
+            .build();
 
         let mut config = Config::builder()
             .appender(Appender::builder().build("stdout", Box::new(stdout)));
@@ -31,6 +33,7 @@ impl LogConfig {
 
         if let Some(dir) = &self.dir {
             let logfile = FileAppender::builder()
+                .encoder(Box::new(PatternEncoder::new("{d(%Y-%m-%d %H:%M:%S)} {l} {t} - {m}{n}")))
                 .build(dir.join(format!("{}.log", name)))
                 .unwrap();
             config = config.appender(Appender::builder().build("logfile", Box::new(logfile)));
