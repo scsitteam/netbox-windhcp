@@ -31,11 +31,35 @@ impl Prefix {
 pub struct PrefixCustomField {
     pub dhcp_lease_duration: Option<u32>,
     dhcp_dns_flags: Option<Vec<String>>,
+    dhcp_router: Option<Ipv4Addr>,
+    dhcp_dns_domain: Option<String>,
+    dhcp_dns_servers: Option<Vec<PrefixCustomFieldIp>>,
+}
+
+
+#[derive(Debug, Deserialize)]
+pub struct PrefixCustomFieldIp {
+    pub address: Ipv4Net
 }
 
 impl PrefixCustomField {
     pub fn dhcp_dns_flags(&self) -> Option<&Vec<String>> {
         self.dhcp_dns_flags.as_ref()
+    }
+
+    pub fn dhcp_router(&self) -> Option<Ipv4Addr> {
+        self.dhcp_router
+    }
+
+    pub fn dhcp_dns_domain(&self) -> Option<&String> {
+        self.dhcp_dns_domain.as_ref()
+    }
+
+    pub fn dhcp_dns_servers(&self) -> Option<Vec<Ipv4Addr>> {
+        match &self.dhcp_dns_servers {
+            Some(dns) => Some(dns.iter().map(|n| n.address.addr()).collect::<Vec<Ipv4Addr>>()),
+            None => None,
+        }
     }
 }
 

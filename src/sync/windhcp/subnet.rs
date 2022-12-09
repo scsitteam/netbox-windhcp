@@ -157,6 +157,150 @@ impl Subnet {
             n => Err(n),
         }
     }
+    
+    fn get_option_ip(&self, optionid: u32) -> Result<Ipv4Addr, u32> {
+        let mut optionvalue: *mut DHCP_OPTION_VALUE = ptr::null_mut();
+
+        let mut scopeinfo = DHCP_OPTION_SCOPE_INFO {
+            ScopeType: DhcpSubnetOptions,
+            ScopeInfo: DHCP_OPTION_SCOPE_INFO_0 { SubnetScopeInfo: self.subnetaddress },
+        };
+
+        match unsafe { DhcpGetOptionValueV5(&self.serveripaddress,
+            0x00,
+            optionid,
+            PCWSTR::null(),
+            PCWSTR::null(),
+            &mut scopeinfo,
+            &mut optionvalue) } {
+                0 => (),
+                n => { return Err(n); },
+        }
+
+        let option = unsafe{ (*((*optionvalue).Value.Elements)).Element.IpAddressOption };
+
+        unsafe { DhcpRpcFreeMemory((*optionvalue).Value.Elements as *mut c_void) };
+        unsafe { DhcpRpcFreeMemory(optionvalue as *mut c_void) };
+
+        Ok(Ipv4Addr::from(option))
+    }
+    
+    fn get_option_ips(&self, optionid: u32) -> Result<Vec<Ipv4Addr>, u32> {
+        let mut optionvalue: *mut DHCP_OPTION_VALUE = ptr::null_mut();
+
+        let mut scopeinfo = DHCP_OPTION_SCOPE_INFO {
+            ScopeType: DhcpSubnetOptions,
+            ScopeInfo: DHCP_OPTION_SCOPE_INFO_0 { SubnetScopeInfo: self.subnetaddress },
+        };
+
+        match unsafe { DhcpGetOptionValueV5(&self.serveripaddress,
+            0x00,
+            optionid,
+            PCWSTR::null(),
+            PCWSTR::null(),
+            &mut scopeinfo,
+            &mut optionvalue) } {
+                0 => (),
+                n => { return Err(n); },
+        }
+
+        let len = unsafe{ (*optionvalue).Value.NumElements };
+
+        let mut ips = Vec::with_capacity(len as usize);
+
+        for idx in 0..len {
+            let element = unsafe{ (*optionvalue).Value.Elements.offset(idx.try_into().unwrap()) };
+            let value = unsafe{ (*element).Element.IpAddressOption };
+            ips.push(Ipv4Addr::from(value));
+            unsafe { DhcpRpcFreeMemory(element as *mut c_void) };
+        }
+
+        unsafe { DhcpRpcFreeMemory(optionvalue as *mut c_void) };
+
+        Ok(ips)
+    }
+
+    fn set_option_ip(&self, optionid: u32, value: Ipv4Addr) -> Result<(), u32> {
+        let mut scopeinfo = DHCP_OPTION_SCOPE_INFO {
+            ScopeType: DhcpSubnetOptions,
+            ScopeInfo: DHCP_OPTION_SCOPE_INFO_0 { SubnetScopeInfo: self.subnetaddress },
+        };
+
+        let mut value = DHCP_OPTION_DATA_ELEMENT {
+            OptionType: DhcpIpAddressOption,
+            Element: DHCP_OPTION_DATA_ELEMENT_0 {
+                IpAddressOption: u32::from(value)
+            },
+        };
+
+        let mut optionvalue = DHCP_OPTION_DATA {
+            NumElements: 1,
+            Elements: &mut value
+        };
+
+        match unsafe { DhcpSetOptionValueV5(&self.serveripaddress,
+            0x00,
+            optionid,
+            PCWSTR::null(),
+            PCWSTR::null(),
+            &mut scopeinfo,
+            &mut optionvalue,
+        ) } {
+            0 => Ok(()),
+            n => Err(n),
+        }
+    }
+
+    fn set_option_ips(&self, optionid: u32, values: &Vec<Ipv4Addr>) -> Result<(), u32> {
+        let mut scopeinfo = DHCP_OPTION_SCOPE_INFO {
+            ScopeType: DhcpSubnetOptions,
+            ScopeInfo: DHCP_OPTION_SCOPE_INFO_0 { SubnetScopeInfo: self.subnetaddress },
+        };
+
+        let mut values = values.iter().map( |i|
+            DHCP_OPTION_DATA_ELEMENT {
+                OptionType: DhcpIpAddressOption,
+                Element: DHCP_OPTION_DATA_ELEMENT_0 {
+                    IpAddressOption: u32::from(i.to_owned())
+                },
+            }
+        ).collect::<Vec<DHCP_OPTION_DATA_ELEMENT>>();
+
+        let mut optionvalue = DHCP_OPTION_DATA {
+            NumElements: values.len() as u32,
+            Elements: values.as_mut_ptr(),
+        };
+
+        match unsafe { DhcpSetOptionValueV5(&self.serveripaddress,
+            0x00,
+            optionid,
+            PCWSTR::null(),
+            PCWSTR::null(),
+            &mut scopeinfo,
+            &mut optionvalue,
+        ) } {
+            0 => Ok(()),
+            n => Err(n),
+        }
+    }
+
+    fn remove_option(&self, optionid: u32) -> Result<(), u32> {
+        let mut scopeinfo = DHCP_OPTION_SCOPE_INFO {
+            ScopeType: DhcpSubnetOptions,
+            ScopeInfo: DHCP_OPTION_SCOPE_INFO_0 { SubnetScopeInfo: self.subnetaddress },
+        };
+
+        match unsafe { DhcpRemoveOptionValueV5(&self.serveripaddress,
+            0x00,
+            optionid,
+            PCWSTR::null(),
+            PCWSTR::null(),
+            &mut scopeinfo,
+        ) } {
+            0 => Ok(()),
+            n => Err(n),
+        }
+    }
 
     pub fn get(serveripaddress: &HSTRING, subnetaddress: &Ipv4Addr) -> Result<Option<Self>, u32> {
         let mut subnetinfo: *mut DHCP_SUBNET_INFO = std::ptr::null_mut();
@@ -331,6 +475,37 @@ impl Subnet {
     pub fn set_dns_flags(&self, dns_flags: &DnsFlags) -> WinDhcpResult<()> {
         self.set_option_u32(81, u32::from(dns_flags))
             .map_err(|e| WinDhcpError::new("setting dns flags", e))
+    }
+
+    pub fn get_router(&self) -> WinDhcpResult<Option<Ipv4Addr>> {
+        match self.get_option_ip(OPTION_ROUTER_ADDRESS) {
+            Ok(value) => Ok(Some(value)),
+            Err(2) => Ok(None),
+            Err(e) => Err(WinDhcpError::new("getting router address", e)),
+        }
+    }
+
+    pub fn set_router(&self, router: Option<Ipv4Addr>) -> WinDhcpResult<()> {
+        if let Some(router) = router {
+            self.set_option_ip(OPTION_ROUTER_ADDRESS, router)
+                .map_err(|e| WinDhcpError::new("setting router address", e))
+        } else {
+            self.remove_option(OPTION_ROUTER_ADDRESS)
+                .map_err(|e| WinDhcpError::new("removing router address", e))
+        }
+    }
+
+    pub fn get_dns(&self) -> WinDhcpResult<Vec<Ipv4Addr>> {
+        match self.get_option_ips(OPTION_DOMAIN_NAME_SERVERS) {
+            Ok(value) => Ok(value),
+            Err(2) => Ok(Vec::new()),
+            Err(e) => Err(WinDhcpError::new("getting dns servers", e)),
+        }
+    }
+
+    pub fn set_dns(&self, dns: &Vec<Ipv4Addr>) -> WinDhcpResult<()> {
+        self.set_option_ips(OPTION_DOMAIN_NAME_SERVERS, dns)
+            .map_err(|e| WinDhcpError::new("setting dns servers", e))
     }
 
     pub fn get_reservations(&self) -> Result<HashMap<Ipv4Addr, Vec<u8>>, u32> {

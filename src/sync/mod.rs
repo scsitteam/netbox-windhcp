@@ -51,7 +51,7 @@ impl Sync {
                     continue;
                 }
             };
-            let subnet = self.sync_subnetv4(prefix, range)?;
+            let subnet = self.sync_subnetv4(prefix, range).await?;
 
             /* Update Reservations */
             let mut dhcp_reservations = subnet.get_reservations().unwrap();
@@ -83,7 +83,7 @@ impl Sync {
         Ok(())
     }
 
-    fn sync_subnetv4(&self, prefix: &Prefix, range: &IpRange) -> Result<Subnet, Box<dyn std::error::Error + Send + std::marker::Sync>> {
+    async fn sync_subnetv4(&self, prefix: &Prefix, range: &IpRange) -> Result<Subnet, Box<dyn std::error::Error + Send + std::marker::Sync>> {
         let subnetaddress = &prefix.addr();
 
         let subnet = self.dhcp.get_or_create_subnet(subnetaddress, &prefix.netmask()).unwrap();
@@ -127,6 +127,32 @@ impl Sync {
         if dns_flags != subnet.get_dns_flags()? {
             if !self.noop { subnet.set_dns_flags(&dns_flags)?; }
             info!("  Subnet {}: Updated dns flags to {:?}", &subnetaddress, dns_flags);
+        }
+
+        /* Router */
+        let router = match prefix.custom_fields.dhcp_router() {
+            Some(ip) => Some(ip),
+            None => {
+                let routers = self.netbox.get_router_for_subnet(&prefix.prefix).await?;
+                if  routers.len() > 1 {
+                    warn!("Multiple router found in {} {:?}", subnetaddress, routers);
+                }
+                routers.get(0).map(|i| i.address())
+            }
+        };
+        if router != subnet.get_router()? {
+            if !self.noop { subnet.set_router(router)?; }
+            info!("  Subnet {}: Updated router to {:?}", &subnetaddress, router);
+        }
+
+        /* DNS Server */
+        let dns = match prefix.custom_fields.dhcp_dns_servers() {
+            Some(dns) => dns,
+            None => self.config.dhcp.default_dns_servers().to_vec(),
+        };
+        if dns != subnet.get_dns()? {
+            if !self.noop { subnet.set_dns(&dns)?; }
+            info!("  Subnet {}: Updated dns to {:?}", &subnetaddress, dns);
         }
 
         Ok(subnet)

@@ -1,6 +1,6 @@
 pub(super) mod model;
 
-use std::collections::HashMap;
+use std::{collections::HashMap, net::Ipv4Addr};
 
 use ipnet::Ipv4Net;
 use log::debug;
@@ -58,6 +58,13 @@ impl NetboxApi {
 
     pub async fn get_reservations_for_subnet(&self, subnet: &Ipv4Net) -> reqwest::Result<Vec<IpAddress>> {
         let mut filter = self.config.reservation_filter.clone();
+        filter.insert(String::from("parent"), subnet.to_string());
+
+        self.get_objects("ipam/ip-addresses/", &filter).await
+    }
+
+    pub async fn get_router_for_subnet(&self, subnet: &Ipv4Net) -> reqwest::Result<Vec<IpAddress>> {
+        let mut filter = self.config.router_filter.clone();
         filter.insert(String::from("parent"), subnet.to_string());
 
         self.get_objects("ipam/ip-addresses/", &filter).await

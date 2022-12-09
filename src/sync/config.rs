@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, net::Ipv4Addr};
 
 use serde::Deserialize;
 
@@ -23,6 +23,7 @@ pub struct SyncNetboxConfig {
     pub(super) prefix_filter: HashMap<String, String>,
     pub(super) range_filter: HashMap<String, String>,
     pub(super) reservation_filter: HashMap<String, String>,
+    pub(super) router_filter: HashMap<String, String>,
 }
 
 impl SyncNetboxConfig {
@@ -45,6 +46,10 @@ impl SyncNetboxConfig {
     pub fn reservation_filter(&self) -> &HashMap<String, String> {
         &self.reservation_filter
     }
+
+    pub fn router_filter(&self) -> &HashMap<String, String> {
+        &self.router_filter
+    }
 }
 
 #[derive(Debug, Deserialize, Clone)]
@@ -53,6 +58,9 @@ pub struct SyncDhcpConfig {
     lease_duration: Option<u32>,
     #[serde(default)]
     default_dns_flags: DnsFlags,
+    default_dns_domain: Option<String>,
+    #[serde(default)]
+    default_dns_servers: Vec<Ipv4Addr>,
 }
 
 impl SyncDhcpConfig {
@@ -66,6 +74,14 @@ impl SyncDhcpConfig {
 
     pub fn default_dns_flags(&self) -> &DnsFlags {
         &self.default_dns_flags
+    }
+
+    pub fn default_dns_domain(&self) -> Option<&String> {
+        self.default_dns_domain.as_ref()
+    }
+
+    pub fn default_dns_servers(&self) -> &[Ipv4Addr] {
+        self.default_dns_servers.as_ref()
     }
 }
 
