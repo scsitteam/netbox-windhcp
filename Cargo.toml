@@ -24,7 +24,6 @@ tokio = { version = "1.22.0", features = ["rt", "macros", "rt-multi-thread", "si
 warp = { version = "0.3.3", features = ["tokio-rustls", "tls"] }
 windows = { version = "0.43.0", features = ["Win32_System_Console", "Win32_Foundation", "Win32_NetworkManagement_Dhcp"] }
 windows-service = "0.5.0"
-windy = "0.2.0"
 
 [dev-dependencies]
 libc = "0.2.138"

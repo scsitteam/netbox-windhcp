@@ -406,14 +406,8 @@ impl Subnet {
         let mut subnetinfo = self.get_subnet_info()
             .map_err(|e| WinDhcpError::new("setting subnet name", e))?;
 
-            #[cfg(target_os = "windows")]
-        let mut wname: windy::WString = name.try_into().unwrap();
-        #[cfg(target_os = "windows")]
-        let wptr = wname.as_mut_c_str().as_mut_ptr();
-        #[cfg(not(target_os = "windows"))]
-        let wptr = name.encode_utf16().chain([0u16]).collect::<Vec<u16>>().as_mut_ptr();
-
-        subnetinfo.SubnetName = PWSTR::from_raw(wptr);
+        let mut wname = name.encode_utf16().chain([0u16]).collect::<Vec<u16>>();
+        subnetinfo.SubnetName = PWSTR(wname.as_mut_ptr());
 
         self.set_subnet_info(subnetinfo)
             .map_err(|e| WinDhcpError::new("setting subnet name", e))
@@ -423,14 +417,8 @@ impl Subnet {
         let mut subnetinfo = self.get_subnet_info()
         .map_err(|e| WinDhcpError::new("setting subnet comment", e))?;
 
-        #[cfg(target_os = "windows")]
-        let mut wcomment: windy::WString = comment.try_into().unwrap();
-        #[cfg(target_os = "windows")]
-        let wptr = wcomment.as_mut_c_str().as_mut_ptr();
-        #[cfg(not(target_os = "windows"))]
-        let wptr = comment.encode_utf16().chain([0u16]).collect::<Vec<u16>>().as_mut_ptr();
-
-        subnetinfo.SubnetComment = PWSTR::from_raw(wptr);
+        let mut wcomment = comment.encode_utf16().chain([0u16]).collect::<Vec<u16>>();
+        subnetinfo.SubnetComment = PWSTR(wcomment.as_mut_ptr());
         self.set_subnet_info(subnetinfo)
             .map_err(|e| WinDhcpError::new("setting subnet comment", e))
     }

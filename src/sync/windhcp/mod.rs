@@ -151,14 +151,8 @@ impl WinDhcp {
 
         let mut info = unsafe { *clientinfo };
 
-        #[cfg(target_os = "windows")]
-        let mut wname: windy::WString = name.try_into().unwrap();
-        #[cfg(target_os = "windows")]
-        let wptr = wname.as_mut_c_str().as_mut_ptr();
-        #[cfg(not(target_os = "windows"))]
-        let wptr = name.encode_utf16().chain([0u16]).collect::<Vec<u16>>().as_mut_ptr();
-
-        info.ClientName = PWSTR::from_raw(wptr);
+        let mut wname = name.encode_utf16().chain([0u16]).collect::<Vec<u16>>();
+        info.ClientName = PWSTR(wname.as_mut_ptr());
 
         let ret = match unsafe { DhcpSetClientInfoV4(&self.serveripaddress, &info) } {
             0 => Ok(()),
@@ -220,14 +214,8 @@ impl WinDhcp {
 
         let mut info = unsafe { *clientinfo };
 
-        #[cfg(target_os = "windows")]
-        let mut wcomment: windy::WString = comment.try_into().unwrap();
-        #[cfg(target_os = "windows")]
-        let wptr = wcomment.as_mut_c_str().as_mut_ptr();
-        #[cfg(not(target_os = "windows"))]
-        let wptr = comment.encode_utf16().chain([0u16]).collect::<Vec<u16>>().as_mut_ptr();
-
-        info.ClientComment = PWSTR::from_raw(wptr);
+        let mut wcomment = comment.encode_utf16().chain([0u16]).collect::<Vec<u16>>();
+        info.ClientComment = PWSTR(wcomment.as_mut_ptr());
 
         let ret = match unsafe { DhcpSetClientInfoV4(&self.serveripaddress, &info) } {
             0 => Ok(()),
