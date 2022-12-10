@@ -1,16 +1,23 @@
 pub(super) mod model;
 
-use std::{collections::HashMap, net::Ipv4Addr};
+use std::collections::HashMap;
 
 use ipnet::Ipv4Net;
 use log::debug;
 use serde::Deserialize;
 
-use super::config::SyncNetboxConfig;
+pub mod config;
+use self::config::SyncNetboxConfig;
 use self::model::*;
+pub mod prefix;
+use prefix::*;
+pub mod range;
+use range::*;
+pub mod address;
+use address::*;
 
 pub struct NetboxApi {
-    pub config: SyncNetboxConfig,
+    config: SyncNetboxConfig,
     client: reqwest::Client,
 }
 
@@ -19,7 +26,7 @@ impl NetboxApi {
         let config = config.clone();
 
         let mut headers = reqwest::header::HeaderMap::new();
-        let mut auth_value = reqwest::header::HeaderValue::from_str(format!("Token {}", config.token).as_str()).unwrap();
+        let mut auth_value = reqwest::header::HeaderValue::from_str(format!("Token {}", config.token()).as_str()).unwrap();
         auth_value.set_sensitive(true);
         headers.insert(reqwest::header::AUTHORIZATION, auth_value);
 
@@ -32,7 +39,7 @@ impl NetboxApi {
     }
 
     pub async fn version(&self) -> Result<String, Box<dyn std::error::Error + Send + std::marker::Sync>> {
-        let url = format!("{}status/", self.config.apiurl);
+        let url = format!("{}status/", self.config.apiurl());
 
         #[derive(Debug, Deserialize)]
         struct NetboxStatus {
@@ -57,21 +64,15 @@ impl NetboxApi {
     }
 
     pub async fn get_reservations_for_subnet(&self, subnet: &Ipv4Net) -> reqwest::Result<Vec<IpAddress>> {
-        let mut filter = self.config.reservation_filter.clone();
-        filter.insert(String::from("parent"), subnet.to_string());
-
-        self.get_objects("ipam/ip-addresses/", &filter).await
+        self.get_objects("ipam/ip-addresses/", &self.config.reservation_filter(subnet)).await
     }
 
     pub async fn get_router_for_subnet(&self, subnet: &Ipv4Net) -> reqwest::Result<Vec<IpAddress>> {
-        let mut filter = self.config.router_filter.clone();
-        filter.insert(String::from("parent"), subnet.to_string());
-
-        self.get_objects("ipam/ip-addresses/", &filter).await
+        self.get_objects("ipam/ip-addresses/", &self.config.router_filter(subnet)).await
     }
 
     async fn get_objects<T: for<'a> Deserialize<'a>>(&self, path: &str, filter: &HashMap<String, String>) -> reqwest::Result<Vec<T>> {
-        let url = format!("{}{}", self.config.apiurl, path);
+        let url = format!("{}{}", self.config.apiurl(), path);
 
         debug!("Fetch {} from {:?}", std::any::type_name::<T>(), url);
         let mut page: Pageination<T> = self.client.get(url)

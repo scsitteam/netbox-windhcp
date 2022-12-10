@@ -131,8 +131,12 @@ impl WinDhcp {
 
         let mut info = unsafe{ *clientinfo };
         
+        #[cfg(window)]
         let mut wname: windy::WString = name.try_into().unwrap();
+        #[cfg(window)]
         let wptr = wname.as_mut_c_str().as_mut_ptr();
+        #[cfg(not(windows))]
+        let wptr = name.encode_utf16().chain([0u16]).collect::<Vec<u16>>().as_mut_ptr();
 
         info.ClientName = PWSTR::from_raw(wptr);
     
@@ -194,8 +198,12 @@ impl WinDhcp {
 
         let mut info = unsafe{ *clientinfo };
         
+        #[cfg(windows)]
         let mut wcomment: windy::WString = comment.try_into().unwrap();
+        #[cfg(windows)]
         let wptr = wcomment.as_mut_c_str().as_mut_ptr();
+        #[cfg(not(windows))]
+        let wptr = comment.encode_utf16().chain([0u16]).collect::<Vec<u16>>().as_mut_ptr();
 
         info.ClientComment = PWSTR::from_raw(wptr);
     

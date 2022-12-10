@@ -7,6 +7,9 @@ use windows::{
 
 use super::{WinDhcpError, WinDhcpResult};
 
+mod options;
+use self::options::*;
+
 #[derive(Debug)]
 pub struct Subnet {
     serveripaddress: HSTRING,
@@ -99,7 +102,7 @@ impl Subnet {
             n => Err(n),
         }
     }
-    
+/*
     fn get_option_u32(&self, optionid: u32) -> Result<u32, u32> {
         let mut optionvalue: *mut DHCP_OPTION_VALUE = ptr::null_mut();
 
@@ -201,7 +204,8 @@ impl Subnet {
             &mut scopeinfo,
             &mut optionvalue) } {
                 0 => (),
-                n => { return Err(n); },
+                2 => return Ok(Vec::new()),
+                e => return Err(e),
         }
 
         let len = unsafe{ (*optionvalue).Value.NumElements };
@@ -252,6 +256,10 @@ impl Subnet {
     }
 
     fn set_option_ips(&self, optionid: u32, values: &Vec<Ipv4Addr>) -> Result<(), u32> {
+        if values.is_empty() {
+            return self.remove_option(optionid);
+        }
+
         let mut scopeinfo = DHCP_OPTION_SCOPE_INFO {
             ScopeType: DhcpSubnetOptions,
             ScopeInfo: DHCP_OPTION_SCOPE_INFO_0 { SubnetScopeInfo: self.subnetaddress },
@@ -283,7 +291,7 @@ impl Subnet {
             n => Err(n),
         }
     }
-
+*/
     fn remove_option(&self, optionid: u32) -> Result<(), u32> {
         let mut scopeinfo = DHCP_OPTION_SCOPE_INFO {
             ScopeType: DhcpSubnetOptions,
@@ -367,10 +375,15 @@ impl Subnet {
         let mut subnetinfo = self.get_subnet_info()
             .map_err(|e| WinDhcpError::new("setting subnet name", e))?;
 
+        #[cfg(windows)]
         let mut wname: windy::WString = name.try_into().unwrap();
+        #[cfg(windows)]
         let wptr = wname.as_mut_c_str().as_mut_ptr();
+        #[cfg(not(windows))]
+        let wptr = name.encode_utf16().chain([0u16]).collect::<Vec<u16>>().as_mut_ptr();
 
         subnetinfo.SubnetName = PWSTR::from_raw(wptr);
+
         self.set_subnet_info(subnetinfo)
             .map_err(|e| WinDhcpError::new("setting subnet name", e))
     }
@@ -379,8 +392,12 @@ impl Subnet {
         let mut subnetinfo = self.get_subnet_info()
         .map_err(|e| WinDhcpError::new("setting subnet comment", e))?;
 
+        #[cfg(windows)]
         let mut wcomment: windy::WString = comment.try_into().unwrap();
+        #[cfg(windows)]
         let wptr = wcomment.as_mut_c_str().as_mut_ptr();
+        #[cfg(not(windows))]
+        let wptr = comment.encode_utf16().chain([0u16]).collect::<Vec<u16>>().as_mut_ptr();
 
         subnetinfo.SubnetComment = PWSTR::from_raw(wptr);
         self.set_subnet_info(subnetinfo)
@@ -451,63 +468,47 @@ impl Subnet {
         Ok(())
     }
 
-    pub fn get_lease_duration(&self) -> WinDhcpResult<u32> {
-        match self.get_option_u32(OPTION_LEASE_TIME) {
-            Ok(duration) => Ok(duration),
-            Err(2) => Ok(0),
-            Err(e) => Err(WinDhcpError::new("getting lease duration", e)),
-        }
+    pub fn get_lease_duration(&self) -> WinDhcpResult<Option<u32>> {
+        self.get_option(OPTION_LEASE_TIME)
     }
 
-    pub fn set_lease_duration(&self, lease_duration: u32) -> WinDhcpResult<()> {
-        self.set_option_u32(OPTION_LEASE_TIME, lease_duration)
-            .map_err(|e| WinDhcpError::new("setting lease duration", e))
+    pub fn set_lease_duration(&self, lease_duration: Option<u32>) -> WinDhcpResult<()> {
+        self.set_option(OPTION_LEASE_TIME, lease_duration.as_ref())
     }
 
-    pub fn get_dns_flags(&self) -> WinDhcpResult<DnsFlags> {
-        match self.get_option_u32(81) {
-            Ok(value) => Ok(DnsFlags::from(value)),
-            Err(2) => Ok(DnsFlags::default()),
-            Err(e) => Err(WinDhcpError::new("getting dns flags", e)),
-        }
+    pub fn get_dns_flags(&self) -> WinDhcpResult<Option<DnsFlags>> {
+        Ok(self.get_option(81)?
+            .map(|f: u32| DnsFlags::from(f)))
     }
 
-    pub fn set_dns_flags(&self, dns_flags: &DnsFlags) -> WinDhcpResult<()> {
-        self.set_option_u32(81, u32::from(dns_flags))
-            .map_err(|e| WinDhcpError::new("setting dns flags", e))
+    pub fn set_dns_flags(&self, dns_flags: Option<&DnsFlags>) -> WinDhcpResult<()> {
+        self.set_option(81, dns_flags.map(u32::from).as_ref())
     }
 
-    pub fn get_router(&self) -> WinDhcpResult<Option<Ipv4Addr>> {
-        match self.get_option_ip(OPTION_ROUTER_ADDRESS) {
-            Ok(value) => Ok(Some(value)),
-            Err(2) => Ok(None),
-            Err(e) => Err(WinDhcpError::new("getting router address", e)),
-        }
+    pub fn get_routers(&self) -> WinDhcpResult<Vec<Ipv4Addr>> {
+        self.get_options(OPTION_ROUTER_ADDRESS)
     }
 
-    pub fn set_router(&self, router: Option<Ipv4Addr>) -> WinDhcpResult<()> {
-        if let Some(router) = router {
-            self.set_option_ip(OPTION_ROUTER_ADDRESS, router)
-                .map_err(|e| WinDhcpError::new("setting router address", e))
-        } else {
-            self.remove_option(OPTION_ROUTER_ADDRESS)
-                .map_err(|e| WinDhcpError::new("removing router address", e))
-        }
+    pub fn set_routers(&self, routers: &Vec<Ipv4Addr>) -> WinDhcpResult<()> {
+        self.set_options(OPTION_ROUTER_ADDRESS, routers)
     }
 
-    pub fn get_dns(&self) -> WinDhcpResult<Vec<Ipv4Addr>> {
-        match self.get_option_ips(OPTION_DOMAIN_NAME_SERVERS) {
-            Ok(value) => Ok(value),
-            Err(2) => Ok(Vec::new()),
-            Err(e) => Err(WinDhcpError::new("getting dns servers", e)),
-        }
+    pub fn get_dns_domain(&self) -> WinDhcpResult<Option<String>> {
+        self.get_option(OPTION_DOMAIN_NAME)
     }
 
-    pub fn set_dns(&self, dns: &Vec<Ipv4Addr>) -> WinDhcpResult<()> {
-        self.set_option_ips(OPTION_DOMAIN_NAME_SERVERS, dns)
-            .map_err(|e| WinDhcpError::new("setting dns servers", e))
+    pub fn set_dns_domain(&self, domain: Option<&String>) -> WinDhcpResult<()> {
+        self.set_option(OPTION_DOMAIN_NAME, domain)
     }
 
+    pub fn get_dns_servers(&self) -> WinDhcpResult<Vec<Ipv4Addr>> {
+        self.get_options(OPTION_DOMAIN_NAME_SERVERS)
+    }
+
+    pub fn set_dns_servers(&self, servers: &Vec<Ipv4Addr>) -> WinDhcpResult<()> {
+        self.set_options(OPTION_DOMAIN_NAME_SERVERS, servers)
+    }
+    
     pub fn get_reservations(&self) -> Result<HashMap<Ipv4Addr, Vec<u8>>, u32> {
         let reservations = self.get_elements(DhcpReservedIps)?;
         if reservations.is_none() { return Ok(HashMap::new()) }
@@ -579,7 +580,6 @@ impl Subnet {
         }
     }
 }
-
 
 #[derive(Debug, PartialEq, Eq)]
 pub struct Reservation {

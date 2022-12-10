@@ -2,17 +2,18 @@ use std::net::Ipv4Addr;
 
 use log::{info, debug, warn};
 
-use crate::sync::mac::MacAddr;
-use crate::sync::windhcp::DnsFlags;
-
-use self::netbox::model::*;
-use self::windhcp::{WinDhcp, Subnet};
-use self::{config::SyncConfig, netbox::NetboxApi};
-
 pub mod config;
-mod netbox;
-mod windhcp;
+use self::netbox::address::{AssignedObject, IpAddress};
+use self::netbox::prefix::Prefix;
+use self::netbox::range::IpRange;
+use self::{config::SyncConfig, netbox::NetboxApi};
 mod mac;
+use self::mac::MacAddr;
+mod netbox;
+
+mod windhcp;
+use self::windhcp::{DnsFlags, WinDhcp, Subnet};
+
 
 pub struct Sync {
     config: SyncConfig,
@@ -37,17 +38,17 @@ impl Sync {
         let dhcp_version = self.dhcp.get_version()?;
         debug!("Windows DHCp Server Version: {}.{}", dhcp_version.0, dhcp_version.1);
 
-        let prefixes: Vec<Prefix> = self.netbox.get_prefixes().await?;
-        let ranges: Vec<IpRange> = self.netbox.get_ranges().await?;
+        let prefixes = self.netbox.get_prefixes().await?;
+        let ranges = self.netbox.get_ranges().await?;
         info!("Found {} Prefixes and {} Ranges", prefixes.len(), ranges.len());
 
         for prefix in prefixes.iter() {
-            info!("Sync Prefix {} - {}", prefix.prefix, prefix.description);
+            info!("Sync Prefix {} - {}", prefix.prefix(), prefix.description());
             
-            let range = match ranges.iter().find(|&r| prefix.prefix.contains(&r.start_address()) && prefix.prefix.contains(&r.end_address())) {
+            let range = match ranges.iter().find(|&r| r.is_contained(prefix)) {
                 Some(r) => r,
                 None => {
-                    warn!("Skip Prefix {} no range found", prefix.prefix);
+                    warn!("Skip Prefix {} no range found", prefix.prefix());
                     continue;
                 }
             };
@@ -55,7 +56,7 @@ impl Sync {
 
             /* Update Reservations */
             let mut dhcp_reservations = subnet.get_reservations().unwrap();
-            let reservations = self.netbox.get_reservations_for_subnet(&prefix.prefix).await?;
+            let reservations = self.netbox.get_reservations_for_subnet(&prefix.prefix()).await?;
             info!("  Subnet {}: Found {} reservations", &prefix.addr(), reservations.len());
 
             for reservation in reservations.iter() {
@@ -96,15 +97,15 @@ impl Sync {
         }
         
         /* Subnet Name */
-        if subnet.subnet_name != prefix.description {
-            if !self.noop { subnet.set_name(&prefix.description)?; }
-            info!("  Subnet {}: Updated name to {}", &subnetaddress, &prefix.description);
+        if subnet.subnet_name != prefix.description() {
+            if !self.noop { subnet.set_name(prefix.description())?; }
+            info!("  Subnet {}: Updated name to {}", &subnetaddress, prefix.description());
         }
         
         /* Subnet Comment */
-        if subnet.subnet_comment != prefix.description {
-            if !self.noop { subnet.set_comment(&prefix.description)?; }
-            info!("  Subnet {}: Updated comment to {}", &subnetaddress, &prefix.description);
+        if subnet.subnet_comment != prefix.description() {
+            if !self.noop { subnet.set_comment(prefix.description())?; }
+            info!("  Subnet {}: Updated comment to {}", &subnetaddress, prefix.description());
         }
 
         /* DHCP Range */
@@ -114,44 +115,47 @@ impl Sync {
         }
 
         /* Lease Duration */
-        let lease_duration = prefix.custom_fields.dhcp_lease_duration
-            .unwrap_or_else(|| self.config.dhcp.lease_duration());
+        let lease_duration = prefix.lease_duration()
+            .or_else(|| Some(self.config.dhcp.lease_duration()));
         if lease_duration != subnet.get_lease_duration()? {
             if !self.noop { subnet.set_lease_duration(lease_duration)?; }
-            info!("  Subnet {}: Updated lease duration to {}", &subnetaddress, lease_duration);
+            info!("  Subnet {}: Updated lease duration to {}", &subnetaddress, lease_duration.unwrap_or_default());
         }
         
         /* DNS Update */
-        let dns_flags = prefix.custom_fields.dhcp_dns_flags()
-            .map_or_else(|| self.config.dhcp.default_dns_flags().to_owned(), DnsFlags::from);
+        let dns_flags = prefix.dns_flags()
+            .map(DnsFlags::from).or_else(|| self.config.dhcp.default_dns_flags());
         if dns_flags != subnet.get_dns_flags()? {
-            if !self.noop { subnet.set_dns_flags(&dns_flags)?; }
+            if !self.noop { subnet.set_dns_flags(dns_flags.as_ref())?; }
             info!("  Subnet {}: Updated dns flags to {:?}", &subnetaddress, dns_flags);
         }
 
         /* Router */
-        let router = match prefix.custom_fields.dhcp_router() {
-            Some(ip) => Some(ip),
+        let routers = match prefix.routers() {
+            Some(ip) => ip,
             None => {
-                let routers = self.netbox.get_router_for_subnet(&prefix.prefix).await?;
-                if  routers.len() > 1 {
-                    warn!("Multiple router found in {} {:?}", subnetaddress, routers);
-                }
-                routers.get(0).map(|i| i.address())
+                let routers = self.netbox.get_router_for_subnet(&prefix.prefix()).await?;
+                routers.iter().map(|i| i.address()).collect()
             }
         };
-        if router != subnet.get_router()? {
-            if !self.noop { subnet.set_router(router)?; }
-            info!("  Subnet {}: Updated router to {:?}", &subnetaddress, router);
+        if routers != subnet.get_routers()? {
+            if !self.noop { subnet.set_routers(&routers)?; }
+            info!("  Subnet {}: Updated routers to {:?}", &subnetaddress, routers);
+        }
+
+        /* DNS Domain */
+        let dns_domain = prefix.dns_domain()
+            .or_else(|| self.config.dhcp.default_dns_domain());
+        if dns_domain != subnet.get_dns_domain()?.as_ref() {
+            if !self.noop { subnet.set_dns_domain(dns_domain)?; }
+            info!("  Subnet {}: Updated dns domain to {:?}", &subnetaddress, dns_domain);
         }
 
         /* DNS Server */
-        let dns = match prefix.custom_fields.dhcp_dns_servers() {
-            Some(dns) => dns,
-            None => self.config.dhcp.default_dns_servers().to_vec(),
-        };
-        if dns != subnet.get_dns()? {
-            if !self.noop { subnet.set_dns(&dns)?; }
+        let dns = prefix.dns_servers()
+            .unwrap_or_else(|| self.config.dhcp.default_dns_servers().to_vec());
+        if dns != subnet.get_dns_servers()? {
+            if !self.noop { subnet.set_dns_servers(&dns)?; }
             info!("  Subnet {}: Updated dns to {:?}", &subnetaddress, dns);
         }
 
@@ -199,23 +203,18 @@ impl Sync {
     }
 
     async fn get_macaddress_for_reservation(&self, reservation: &IpAddress) -> Result<Option<Vec<u8>>, Box<dyn std::error::Error + Send + std::marker::Sync>> {
-        let mac = match reservation.custom_fields().dhcp_reservation_mac() {
-            Some(mac) => mac.clone(),
-            None => match self.get_macaddress_for_reservation_from_assigned_object(reservation.assigned_object()).await? {
-                Some(mac) => mac,
-                None => return Ok(None),
-            }
+        let mac = match reservation.reservation_mac() {
+            Some(mac) => Some(mac.clone()),
+            None => match reservation.assigned_object_url() {
+                Some(url) => self.get_macaddress_for_reservation_from_assigned_object(url).await?,
+                None => None,
+            },
         };
 
-        Ok(Some(Vec::<u8>::from_mac(&mac)))
+        Ok(mac.map(|m| Vec::<u8>::from_mac(&m)))
     }
 
-    async fn get_macaddress_for_reservation_from_assigned_object(&self, object: Option<&IpAddressAssignedObject>) -> Result<Option<String>, Box<dyn std::error::Error + Send + std::marker::Sync>> {
-        let url = match object.and_then(|o| o.url().cloned()) {
-            Some(url) => url,
-            None => return Ok(None),
-        };
-
-        Ok(self.netbox.get_object::<AssignedObject>(url.as_str()).await?.mac_address().cloned())
+    async fn get_macaddress_for_reservation_from_assigned_object(&self, url: &str) -> Result<Option<String>, Box<dyn std::error::Error + Send + std::marker::Sync>> {
+        Ok(self.netbox.get_object::<AssignedObject>(url).await?.mac_address().cloned())
     }
 }

@@ -6,11 +6,13 @@ use serde::Deserialize;
 use crate::logging::LogConfig;
 
 use super::server::config::WebhookConfig;
+#[cfg(windows)]
 use super::sync::config::SyncConfig;
 
 #[derive(Debug, Deserialize)]
 pub struct Config {
     pub webhook: WebhookConfig,
+    #[cfg(windows)]
     pub sync: SyncConfig,
     #[serde(default)]
     pub log: LogConfig
