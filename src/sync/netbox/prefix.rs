@@ -7,7 +7,7 @@ use serde::Deserialize;
 pub struct Prefix {
     prefix: Ipv4Net,
     description: String,
-    custom_fields: PrefixCustomField
+    custom_fields: PrefixCustomField,
 }
 
 impl Prefix {
@@ -63,7 +63,7 @@ struct PrefixCustomField {
 
 #[derive(Debug, Deserialize)]
 struct PrefixCustomFieldIp {
-    address: Ipv4Net
+    address: Ipv4Net,
 }
 
 #[cfg(test)]

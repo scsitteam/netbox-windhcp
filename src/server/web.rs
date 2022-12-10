@@ -1,18 +1,28 @@
-use std::{ops::Deref, fmt::Debug, convert::Infallible};
+use std::{convert::Infallible, fmt::Debug, ops::Deref};
 
 use hyper::StatusCode;
 use log::{debug, warn};
 use serde::Serialize;
 use tokio::sync::broadcast;
-use warp::{hyper::Uri, Filter, reject::{Reject}};
+use warp::{hyper::Uri, reject::Reject, Filter};
+use hmac::{Hmac, Mac};
+use sha2::Sha512;
+type HmacSha512 = Hmac<Sha512>;
 
-use super::{shared::{SharedServerStatus, Message}, webhook::NetboxWebHook, config::WebhookConfig};
+use super::{
+    config::WebhookConfig,
+    shared::{Message, SharedServerStatus},
+    webhook::NetboxWebHook,
+};
 
-pub async fn server(config: &WebhookConfig, status: &SharedServerStatus, message_tx: &broadcast::Sender<Message>) {
-
+pub async fn server(
+    config: &WebhookConfig,
+    status: &SharedServerStatus,
+    message_tx: &broadcast::Sender<Message>,
+) {
     let index_route = warp::get()
         .and(warp::path::end())
-        .map(|| { warp::redirect::found(Uri::from_static("/status")) });
+        .map(|| warp::redirect::found(Uri::from_static("/status")));
 
     let status_clone = status.clone();
     let status_filter = warp::any().map(move || status_clone.clone());
@@ -20,14 +30,15 @@ pub async fn server(config: &WebhookConfig, status: &SharedServerStatus, message
         .and(warp::path("status")).and(warp::path::end())
         .and(status_filter)
         .and_then(|status: SharedServerStatus| async move {
-                let status = status.lock().await;
-                match serde_json::to_string_pretty(&status.deref()) {
-                    Ok(s) => Ok(s),
-                    Err(_e) => Err(warp::reject()),
-                }
-        }).map(|reply| {
+            let status = status.lock().await;
+            match serde_json::to_string_pretty(&status.deref()) {
+                Ok(s) => Ok(s),
+                Err(_e) => Err(warp::reject()),
+            }
+        })
+        .map(|reply|
             warp::reply::with_header(reply, warp::http::header::REFRESH, "5")
-        });
+        );
 
     let status_clone = status.clone();
     let status_filter = warp::any().map(move || status_clone.clone());
@@ -91,9 +102,6 @@ pub async fn server(config: &WebhookConfig, status: &SharedServerStatus, message
     }
 }
 
-use sha2::Sha512;
-use hmac::{Hmac, Mac};
-type HmacSha512 = Hmac<Sha512>;
 
 #[derive(Debug, PartialEq, Eq)]
 pub enum WebErrors {
@@ -110,9 +118,10 @@ struct ErrorMessage {
     message: String,
 }
 
-fn netbox_webhook_body(secret: Option<String>) -> impl Filter<Extract = (NetboxWebHook, ), Error = warp::Rejection> + Clone {
-
-    let f = warp::any().map( move || secret.clone());
+fn netbox_webhook_body(
+    secret: Option<String>,
+) -> impl Filter<Extract = (NetboxWebHook,), Error = warp::Rejection> + Clone {
+    let f = warp::any().map(move || secret.clone());
 
     warp::any()
         .and(f)
@@ -167,7 +176,7 @@ async fn handle_rejection(err: warp::Rejection) -> Result<impl warp::Reply, Infa
 
 #[cfg(test)]
 mod tests {
-    use chrono::{Utc, TimeZone};
+    use chrono::{TimeZone, Utc};
 
     use crate::server::webhook::NetboxWebHookEvent;
 

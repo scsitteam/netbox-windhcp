@@ -1,5 +1,5 @@
 use log::info;
-use tokio::{sync::broadcast, task::JoinHandle, signal};
+use tokio::{signal, sync::broadcast, task::JoinHandle};
 
 use super::shared::Message;
 

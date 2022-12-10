@@ -1,15 +1,15 @@
-mod shared;
 pub mod config;
 mod interval;
+#[cfg(windows)]
+pub mod service;
+mod shared;
 mod signal;
 mod sync;
 mod web;
 mod webhook;
-#[cfg(windows)]
-pub mod service;
 
-use std::sync::{mpsc as std_mpsc, Arc};
 use log::debug;
+use std::sync::{mpsc as std_mpsc, Arc};
 use tokio::sync::{broadcast, Mutex};
 
 use crate::{server::shared::ServerStatus, Config};
@@ -17,7 +17,6 @@ use crate::{server::shared::ServerStatus, Config};
 use self::shared::{Message, SharedServerStatus};
 
 pub fn run(shutdown_rx: Option<std_mpsc::Receiver<Message>>) {
-
     let config = match Config::load_from_file() {
         Ok(config) => config.webhook,
         Err(e) => {
@@ -31,7 +30,6 @@ pub fn run(shutdown_rx: Option<std_mpsc::Receiver<Message>>) {
         .build()
         .unwrap()
         .block_on(async {
-
             let status: SharedServerStatus = Arc::new(Mutex::new(ServerStatus::new()));
             let (message_tx, message_rx) = broadcast::channel(16);
 
@@ -45,7 +43,7 @@ pub fn run(shutdown_rx: Option<std_mpsc::Receiver<Message>>) {
                     while let Ok(msg) = shutdown_rx.recv() {
                         debug!("Channel proxy got: {:?}", &msg);
                         message_tx.send(msg).unwrap();
-                    };
+                    }
                 });
                 debug!("Start Proxy Done");
             }
@@ -54,6 +52,5 @@ pub fn run(shutdown_rx: Option<std_mpsc::Receiver<Message>>) {
                 self::web::server(&config, &status, &message_tx),
                 self::sync::worker(&config, &status, &message_tx, message_rx)
             );
-
-    })
+        })
 }

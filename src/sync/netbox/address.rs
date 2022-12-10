@@ -52,7 +52,7 @@ impl IpAddress {
 
 #[derive(Debug, Deserialize)]
 pub struct AssignedObject {
-    mac_address: Option<String>
+    mac_address: Option<String>,
 }
 
 impl AssignedObject {

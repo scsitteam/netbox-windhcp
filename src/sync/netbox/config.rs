@@ -39,7 +39,6 @@ impl Default for SyncNetboxConfig {
     }
 }
 
-
 impl SyncNetboxConfig {
     pub fn apiurl(&self) -> &str {
         self.apiurl.as_ref()
@@ -63,7 +62,7 @@ impl SyncNetboxConfig {
         filter
     }
 
-    pub fn router_filter(&self,  parent: &Ipv4Net) -> HashMap<String, String> {
+    pub fn router_filter(&self, parent: &Ipv4Net) -> HashMap<String, String> {
         let mut filter = self.router_filter.clone();
         filter.insert(String::from("parent"), parent.to_string());
         filter

@@ -1,8 +1,8 @@
+use log::debug;
 use std::net::Ipv4Addr;
 use std::os::raw::c_void;
 use std::ptr;
 use std::sync::atomic::{AtomicUsize, Ordering};
-use log::debug;
 use windows::core::{HSTRING, PWSTR};
 use windows::Win32::NetworkManagement::Dhcp::*;
 
@@ -24,7 +24,7 @@ impl WinDhcp {
         if GLOBAL_DHCP_INIT_COUNT.fetch_add(1, Ordering::SeqCst) == 0 {
             let mut version: u32 = 0;
             let ret = unsafe { DhcpCApiInitialize(&mut version) };
-            
+
             debug!("Init WinDhcp Api v{} [{}]", version, ret);
         }
 
@@ -48,19 +48,27 @@ impl WinDhcp {
 
         let mut enuminfo: *mut DHCP_IP_ARRAY = ptr::null_mut();
 
-        match unsafe { DhcpEnumSubnets(&self.serveripaddress,
-            &mut resumehandle,
-            0xFFFFFFFF,
-            &mut enuminfo,
-            &mut elementsread,
-            &mut elementstotal)} {
-                0 => (),
-                //ERROR_NO_MORE_ITEMS
-                259 => { return Ok(Vec::new()); },
-                e => { return Err(WinDhcpError::new("listing subnets", e)); },
+        match unsafe {
+            DhcpEnumSubnets(
+                &self.serveripaddress,
+                &mut resumehandle,
+                0xFFFFFFFF,
+                &mut enuminfo,
+                &mut elementsread,
+                &mut elementstotal,
+            )
+        } {
+            0 => (),
+            //ERROR_NO_MORE_ITEMS
+            259 => {
+                return Ok(Vec::new());
+            }
+            e => {
+                return Err(WinDhcpError::new("listing subnets", e));
+            }
         }
 
-        let data: DHCP_IP_ARRAY = unsafe {*enuminfo};
+        let data: DHCP_IP_ARRAY = unsafe { *enuminfo };
 
         let mut subnets = Vec::with_capacity(data.NumElements.try_into().unwrap());
 
@@ -74,7 +82,11 @@ impl WinDhcp {
         Ok(subnets)
     }
 
-    pub fn get_or_create_subnet(&self, subnetaddress: &Ipv4Addr, subnetmask: &Ipv4Addr) -> Result<Subnet, u32> {
+    pub fn get_or_create_subnet(
+        &self,
+        subnetaddress: &Ipv4Addr,
+        subnetmask: &Ipv4Addr,
+    ) -> Result<Subnet, u32> {
         match Subnet::get(&self.serveripaddress, subnetaddress)? {
             Some(subnet) => Ok(subnet),
             None => Subnet::create(&self.serveripaddress, subnetaddress, subnetmask),
@@ -82,9 +94,15 @@ impl WinDhcp {
     }
 
     pub fn remove_subnet(&self, subnetaddress: Ipv4Addr) -> WinDhcpResult<()> {
-        match unsafe { DhcpDeleteSubnet(&self.serveripaddress, u32::from(subnetaddress), DhcpFullForce)} {
-                0 => Ok(()),
-                e => Err(WinDhcpError::new("removing subnet", e)),
+        match unsafe {
+            DhcpDeleteSubnet(
+                &self.serveripaddress,
+                u32::from(subnetaddress),
+                DhcpFullForce,
+            )
+        } {
+            0 => Ok(()),
+            e => Err(WinDhcpError::new("removing subnet", e)),
         }
     }
 
@@ -95,16 +113,18 @@ impl WinDhcp {
             SearchType: DHCP_SEARCH_INFO_TYPE(0),
             SearchInfo: DHCP_SEARCH_INFO_0 { ClientIpAddress: u32::from(clientip) },
         };
-        match unsafe { DhcpGetClientInfoV4(&self.serveripaddress, &searchinfo, &mut clientinfo)} {
-                0 => (),
-                n => { return Err(n); },
+        match unsafe { DhcpGetClientInfoV4(&self.serveripaddress, &searchinfo, &mut clientinfo) } {
+            0 => (),
+            n => {
+                return Err(n);
+            }
         }
 
-        let info = unsafe{ *clientinfo };
+        let info = unsafe { *clientinfo };
 
         let name = match info.ClientName.is_null() {
             true => String::from(""),
-            false => unsafe{info.ClientName.to_string()}.unwrap_or_default(),
+            false => unsafe { info.ClientName.to_string() }.unwrap_or_default(),
         };
 
         unsafe { DhcpRpcFreeMemory((*clientinfo).ClientName.as_ptr() as *mut c_void) };
@@ -116,21 +136,21 @@ impl WinDhcp {
 
         Ok(name)
     }
-    
-    pub fn set_client_name(&self, clientip: Ipv4Addr, name: &str) -> WinDhcpResult<()>  {
+
+    pub fn set_client_name(&self, clientip: Ipv4Addr, name: &str) -> WinDhcpResult<()> {
         let mut clientinfo: *mut DHCP_CLIENT_INFO_V4 = ptr::null_mut();
 
         let searchinfo = DHCP_SEARCH_INFO {
             SearchType: DHCP_SEARCH_INFO_TYPE(0),
             SearchInfo: DHCP_SEARCH_INFO_0 { ClientIpAddress: u32::from(clientip) },
         };
-        match unsafe { DhcpGetClientInfoV4(&self.serveripaddress, &searchinfo, &mut clientinfo)} {
-                0 => (),
-                e => return Err(WinDhcpError::new("setting client name", e)),
+        match unsafe { DhcpGetClientInfoV4(&self.serveripaddress, &searchinfo, &mut clientinfo) } {
+            0 => (),
+            e => return Err(WinDhcpError::new("setting client name", e)),
         }
 
-        let mut info = unsafe{ *clientinfo };
-        
+        let mut info = unsafe { *clientinfo };
+
         #[cfg(window)]
         let mut wname: windy::WString = name.try_into().unwrap();
         #[cfg(window)]
@@ -139,8 +159,8 @@ impl WinDhcp {
         let wptr = name.encode_utf16().chain([0u16]).collect::<Vec<u16>>().as_mut_ptr();
 
         info.ClientName = PWSTR::from_raw(wptr);
-    
-        let ret = match unsafe { DhcpSetClientInfoV4(&self.serveripaddress, &info)} {
+
+        let ret = match unsafe { DhcpSetClientInfoV4(&self.serveripaddress, &info) } {
             0 => Ok(()),
             e => Err(WinDhcpError::new("setting client name", e)),
         };
@@ -162,16 +182,18 @@ impl WinDhcp {
             SearchType: DHCP_SEARCH_INFO_TYPE(0),
             SearchInfo: DHCP_SEARCH_INFO_0 { ClientIpAddress: u32::from(clientip) },
         };
-        match unsafe { DhcpGetClientInfoV4(&self.serveripaddress, &searchinfo, &mut clientinfo)} {
-                0 => (),
-                n => { return Err(n); },
+        match unsafe { DhcpGetClientInfoV4(&self.serveripaddress, &searchinfo, &mut clientinfo) } {
+            0 => (),
+            n => {
+                return Err(n);
+            }
         }
 
-        let info = unsafe{ *clientinfo };
+        let info = unsafe { *clientinfo };
 
         let name = match info.ClientComment.is_null() {
             true => String::from(""),
-            false => unsafe{info.ClientComment.to_string()}.unwrap_or_default(),
+            false => unsafe { info.ClientComment.to_string() }.unwrap_or_default(),
         };
 
         unsafe { DhcpRpcFreeMemory((*clientinfo).ClientName.as_ptr() as *mut c_void) };
@@ -183,21 +205,21 @@ impl WinDhcp {
 
         Ok(name)
     }
-    
-    pub fn set_client_comment(&self, clientip: Ipv4Addr, comment: &str) -> WinDhcpResult<()>  {
+
+    pub fn set_client_comment(&self, clientip: Ipv4Addr, comment: &str) -> WinDhcpResult<()> {
         let mut clientinfo: *mut DHCP_CLIENT_INFO_V4 = ptr::null_mut();
 
         let searchinfo = DHCP_SEARCH_INFO {
             SearchType: DHCP_SEARCH_INFO_TYPE(0),
             SearchInfo: DHCP_SEARCH_INFO_0 { ClientIpAddress: u32::from(clientip) },
         };
-        match unsafe { DhcpGetClientInfoV4(&self.serveripaddress, &searchinfo, &mut clientinfo)} {
-                0 => (),
-                e => return Err(WinDhcpError::new("setting client name", e)),
+        match unsafe { DhcpGetClientInfoV4(&self.serveripaddress, &searchinfo, &mut clientinfo) } {
+            0 => (),
+            e => return Err(WinDhcpError::new("setting client name", e)),
         }
 
-        let mut info = unsafe{ *clientinfo };
-        
+        let mut info = unsafe { *clientinfo };
+
         #[cfg(windows)]
         let mut wcomment: windy::WString = comment.try_into().unwrap();
         #[cfg(windows)]
@@ -206,8 +228,8 @@ impl WinDhcp {
         let wptr = comment.encode_utf16().chain([0u16]).collect::<Vec<u16>>().as_mut_ptr();
 
         info.ClientComment = PWSTR::from_raw(wptr);
-    
-        let ret = match unsafe { DhcpSetClientInfoV4(&self.serveripaddress, &info)} {
+
+        let ret = match unsafe { DhcpSetClientInfoV4(&self.serveripaddress, &info) } {
             0 => Ok(()),
             e => Err(WinDhcpError::new("setting client name", e)),
         };
@@ -221,7 +243,6 @@ impl WinDhcp {
 
         ret
     }
-
 }
 
 impl Drop for WinDhcp {

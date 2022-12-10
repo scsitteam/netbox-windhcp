@@ -12,7 +12,7 @@ pub struct NetboxWebHook {
 }
 
 #[derive(Debug, Deserialize, PartialEq, Eq)]
-#[serde(rename_all="lowercase")]
+#[serde(rename_all = "lowercase")]
 pub enum NetboxWebHookEvent {
     Created,
     Updated,

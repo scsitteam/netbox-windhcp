@@ -1,6 +1,6 @@
 use std::net::Ipv4Addr;
 
-use log::{info, debug, warn};
+use log::{debug, info, warn};
 
 pub mod config;
 use self::netbox::address::{AssignedObject, IpAddress};
@@ -12,14 +12,13 @@ use self::mac::MacAddr;
 mod netbox;
 
 mod windhcp;
-use self::windhcp::{DnsFlags, WinDhcp, Subnet};
-
+use self::windhcp::{DnsFlags, Subnet, WinDhcp};
 
 pub struct Sync {
     config: SyncConfig,
     netbox: NetboxApi,
     dhcp: WinDhcp,
-    noop: bool
+    noop: bool,
 }
 
 impl Sync {
@@ -44,7 +43,7 @@ impl Sync {
 
         for prefix in prefixes.iter() {
             info!("Sync Prefix {} - {}", prefix.prefix(), prefix.description());
-            
+
             let range = match ranges.iter().find(|&r| r.is_contained(prefix)) {
                 Some(r) => r,
                 None => {
@@ -84,7 +83,11 @@ impl Sync {
         Ok(())
     }
 
-    async fn sync_subnetv4(&self, prefix: &Prefix, range: &IpRange) -> Result<Subnet, Box<dyn std::error::Error + Send + std::marker::Sync>> {
+    async fn sync_subnetv4(
+        &self,
+        prefix: &Prefix,
+        range: &IpRange,
+    ) -> Result<Subnet, Box<dyn std::error::Error + Send + std::marker::Sync>> {
         let subnetaddress = &prefix.addr();
 
         let subnet = self.dhcp.get_or_create_subnet(subnetaddress, &prefix.netmask()).unwrap();
@@ -95,13 +98,13 @@ impl Sync {
             if !self.noop { subnet.set_mask(prefix.netmask())?; }
             info!("  Subnet {}: Updated netmask to {}", &subnetaddress, prefix.netmask());
         }
-        
+
         /* Subnet Name */
         if subnet.subnet_name != prefix.description() {
             if !self.noop { subnet.set_name(prefix.description())?; }
             info!("  Subnet {}: Updated name to {}", &subnetaddress, prefix.description());
         }
-        
+
         /* Subnet Comment */
         if subnet.subnet_comment != prefix.description() {
             if !self.noop { subnet.set_comment(prefix.description())?; }
@@ -121,7 +124,7 @@ impl Sync {
             if !self.noop { subnet.set_lease_duration(lease_duration)?; }
             info!("  Subnet {}: Updated lease duration to {}", &subnetaddress, lease_duration.unwrap_or_default());
         }
-        
+
         /* DNS Update */
         let dns_flags = prefix.dns_flags()
             .map(DnsFlags::from).or_else(|| self.config.dhcp.default_dns_flags());
@@ -162,7 +165,12 @@ impl Sync {
         Ok(subnet)
     }
 
-    async fn sync_reservationv4(&self, subnet: &Subnet, reservation: &IpAddress, dhcp_mac: Option<Vec<u8>>) -> Result<(), Box<dyn std::error::Error + Send + std::marker::Sync>> {
+    async fn sync_reservationv4(
+        &self,
+        subnet: &Subnet,
+        reservation: &IpAddress,
+        dhcp_mac: Option<Vec<u8>>,
+    ) -> Result<(), Box<dyn std::error::Error + Send + std::marker::Sync>> {
         let mac = match self.get_macaddress_for_reservation(reservation).await? {
             Some(mac) => mac,
             None => {
@@ -202,7 +210,10 @@ impl Sync {
         Ok(())
     }
 
-    async fn get_macaddress_for_reservation(&self, reservation: &IpAddress) -> Result<Option<Vec<u8>>, Box<dyn std::error::Error + Send + std::marker::Sync>> {
+    async fn get_macaddress_for_reservation(
+        &self,
+        reservation: &IpAddress,
+    ) -> Result<Option<Vec<u8>>, Box<dyn std::error::Error + Send + std::marker::Sync>> {
         let mac = match reservation.reservation_mac() {
             Some(mac) => Some(mac.clone()),
             None => match reservation.assigned_object_url() {

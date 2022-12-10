@@ -1,27 +1,45 @@
-use std::{time::Duration, env::{self, consts::EXE_SUFFIX}, path::PathBuf, error::Error, process::Stdio};
+use std::{
+    env::{self, consts::EXE_SUFFIX},
+    error::Error,
+    path::PathBuf,
+    process::Stdio,
+    time::Duration,
+};
 
 use chrono::Utc;
-use log::{info, debug, error};
-use tokio::{sync::broadcast::{self, error::RecvError}, time::{sleep, error::Elapsed, Instant}, process::Command};
+use log::{debug, error, info};
+use tokio::{
+    process::Command,
+    sync::broadcast::{self, error::RecvError},
+    time::{error::Elapsed, sleep, Instant},
+};
 
-use super::{config::WebhookConfig, shared::{SharedServerStatus, Message}};
+use super::{
+    config::WebhookConfig,
+    shared::{Message, SharedServerStatus},
+};
 
 fn get_sync_binary() -> Result<PathBuf, Box<dyn Error>> {
     let sync_exe = env::current_exe()?
         .parent().ok_or(SyncError::CommandNotFound)?
         .join(format!("netbox-windhcp-sync{}", EXE_SUFFIX));
-    if ! sync_exe.is_file() {
+    if !sync_exe.is_file() {
         error!("Sync binary at {} not found.", sync_exe.display());
         return Err(Box::new(SyncError::CommandNotFound));
     }
     Ok(sync_exe)
 }
 
-pub async fn worker(config: &WebhookConfig, status: &SharedServerStatus, message_tx: &broadcast::Sender<Message>, mut message_rx: broadcast::Receiver<Message>) {
+pub async fn worker(
+    config: &WebhookConfig,
+    status: &SharedServerStatus,
+    message_tx: &broadcast::Sender<Message>,
+    mut message_rx: broadcast::Receiver<Message>,
+) {
     let status: SharedServerStatus = status.clone();
     let sync_standoff_time = config.sync_standoff_time();
     let sync_timeout = config.sync_timeout();
-    
+
     let sync_command = match get_sync_binary() {
         Ok(bin) => bin,
         Err(e) => {
@@ -36,7 +54,7 @@ pub async fn worker(config: &WebhookConfig, status: &SharedServerStatus, message
         match message_rx.recv().await {
             Ok(Message::Shutdown) | Err(RecvError::Closed) => { break; },
             Ok(Message::TriggerSync) => {
-                if ! status.lock().await.needs_sync {
+                if !status.lock().await.needs_sync {
                     debug!("Sync not required");
                     continue;
                 }
@@ -50,7 +68,6 @@ pub async fn worker(config: &WebhookConfig, status: &SharedServerStatus, message
                     status.syncing = true;
                 }
 
-                
                 let sync_start = Instant::now();
                 let sync_status = run_sync_command(&sync_command, &sync_timeout).await;
 
@@ -61,7 +78,6 @@ pub async fn worker(config: &WebhookConfig, status: &SharedServerStatus, message
                             let mut status = status.lock().await;
                             status.syncing = false;
                             status.last_sync = Some(Utc::now());
-
                         }
                     }
                     Err(e) => {
@@ -70,7 +86,6 @@ pub async fn worker(config: &WebhookConfig, status: &SharedServerStatus, message
                             let mut status = status.lock().await;
                             status.syncing = false;
                             status.last_sync = Some(Utc::now());
-
                         }
                     }
                 }
@@ -121,7 +136,7 @@ async fn run_sync_command(command: &PathBuf, timeout: &Duration) -> Result<(), S
         Err(e) => {
             debug!("Sync Command reached timeout. Terminating process.");
             child.kill().await?;
-            return Err(SyncError::Timeout(e))
+            return Err(SyncError::Timeout(e));
         }
     }?;
 

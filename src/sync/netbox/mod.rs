@@ -33,18 +33,21 @@ impl NetboxApi {
         let client = reqwest::Client::builder()
             .danger_accept_invalid_certs(true)
             .default_headers(headers)
-            .build().unwrap();
+            .build()
+            .unwrap();
 
         Self { config, client }
     }
 
-    pub async fn version(&self) -> Result<String, Box<dyn std::error::Error + Send + std::marker::Sync>> {
+    pub async fn version(
+        &self,
+    ) -> Result<String, Box<dyn std::error::Error + Send + std::marker::Sync>> {
         let url = format!("{}status/", self.config.apiurl());
 
         #[derive(Debug, Deserialize)]
         struct NetboxStatus {
-            #[serde(rename="netbox-version")]
-            netbox_version: String
+            #[serde(rename = "netbox-version")]
+            netbox_version: String,
         }
 
         let status: NetboxStatus = self.client.get(url)
@@ -71,7 +74,11 @@ impl NetboxApi {
         self.get_objects("ipam/ip-addresses/", &self.config.router_filter(subnet)).await
     }
 
-    async fn get_objects<T: for<'a> Deserialize<'a>>(&self, path: &str, filter: &HashMap<String, String>) -> reqwest::Result<Vec<T>> {
+    async fn get_objects<T: for<'a> Deserialize<'a>>(
+        &self,
+        path: &str,
+        filter: &HashMap<String, String>,
+    ) -> reqwest::Result<Vec<T>> {
         let url = format!("{}{}", self.config.apiurl(), path);
 
         debug!("Fetch {} from {:?}", std::any::type_name::<T>(), url);
@@ -85,7 +92,7 @@ impl NetboxApi {
 
         loop {
             objects.append(&mut page.results);
-    
+
             match page.next {
                 Some(ref u) => {
                     debug!("Fetch next page from {:?}", u);

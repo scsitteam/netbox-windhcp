@@ -15,14 +15,20 @@ pub struct Config {
     #[cfg(windows)]
     pub sync: SyncConfig,
     #[serde(default)]
-    pub log: LogConfig
+    pub log: LogConfig,
 }
 
 impl Config {
     #[cfg(debug_assertions)]
     const CONFIG_FILE: &str = concat!("./", env!("CARGO_CRATE_NAME"), ".cfg");
     #[cfg(not(debug_assertions))]
-    const CONFIG_FILE: &str = concat!("C:\\ProgramData\\", env!(CARGO_CRATE_NAME), "\\", env!(CARGO_CRATE_NAME), ".cfg");
+    const CONFIG_FILE: &str = concat!(
+        "C:\\ProgramData\\",
+        env!(CARGO_CRATE_NAME),
+        "\\",
+        env!(CARGO_CRATE_NAME),
+        ".cfg"
+    );
 
     pub fn load_from_file() -> Result<Self, Box<dyn Error>> {
         let file = File::open(Self::CONFIG_FILE)?;
@@ -30,5 +36,3 @@ impl Config {
         Ok(serde_yaml::from_reader::<File, Config>(file)?)
     }
 }
-
-

@@ -1,13 +1,13 @@
 use std::{ffi::OsString, time::Duration};
 
 use log::{debug, error, info};
-use windows::Win32::System::Console::{GetStdHandle, STD_ERROR_HANDLE};
 use std::sync::mpsc;
+use windows::Win32::System::Console::{GetStdHandle, STD_ERROR_HANDLE};
 use windows_service::{
     define_windows_service,
-    service_control_handler::{ServiceControlHandlerResult, self, ServiceStatusHandle},
     service::*,
-    service_dispatcher
+    service_control_handler::{self, ServiceControlHandlerResult, ServiceStatusHandle},
+    service_dispatcher,
 };
 
 use crate::server::Message;
@@ -46,10 +46,9 @@ pub fn service_main(arguments: Vec<OsString>) {
             return;
         },
     };
-    
+
     debug!("Started service_main: {:?}", arguments);
 
-    
     if set_service_status(&status_handle, ServiceState::Running).is_err() {
         return;
     }
@@ -59,7 +58,10 @@ pub fn service_main(arguments: Vec<OsString>) {
     let _ = set_service_status(&status_handle, ServiceState::Stopped);
 }
 
-fn set_service_status(status_handle: &ServiceStatusHandle, current_state: ServiceState) -> Result<(), windows_service::Error> {
+fn set_service_status(
+    status_handle: &ServiceStatusHandle,
+    current_state: ServiceState,
+) -> Result<(), windows_service::Error> {
     let controls_accepted = match current_state {
         ServiceState::Stopped => ServiceControlAccept::empty(),
         ServiceState::Running => ServiceControlAccept::STOP,

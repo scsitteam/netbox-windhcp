@@ -1,13 +1,17 @@
 use chrono::Utc;
-use log::{info, error, debug};
+use log::{debug, error, info};
 use tokio::{sync::broadcast, task::JoinHandle, time::sleep};
 
 use super::{
     config::WebhookConfig,
-    shared::{SharedServerStatus, Message}
+    shared::{Message, SharedServerStatus},
 };
 
-pub fn spawn(config: &WebhookConfig, status: &SharedServerStatus, sync_tx: &broadcast::Sender<Message>) -> JoinHandle<()> {
+pub fn spawn(
+    config: &WebhookConfig,
+    status: &SharedServerStatus,
+    sync_tx: &broadcast::Sender<Message>,
+) -> JoinHandle<()> {
     let status = status.clone();
     let sync_tx = sync_tx.clone();
     let interval = config.sync_interval();
@@ -17,7 +21,7 @@ pub fn spawn(config: &WebhookConfig, status: &SharedServerStatus, sync_tx: &broa
             let last_sync = {
                 status.lock().await.last_sync
             }.unwrap_or(Utc::now() - interval);
-            
+
             let next_sync = last_sync + interval;
 
             if next_sync <= Utc::now() {
@@ -34,7 +38,7 @@ pub fn spawn(config: &WebhookConfig, status: &SharedServerStatus, sync_tx: &broa
 
                 continue;
             }
-            
+
             let delta = next_sync.signed_duration_since(Utc::now());
             debug!("Wait for next Intervall Sync {}", delta);
 

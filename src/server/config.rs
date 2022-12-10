@@ -1,4 +1,4 @@
-use std::{time::Duration, net::SocketAddr};
+use std::{net::SocketAddr, time::Duration};
 
 use serde::Deserialize;
 
@@ -45,7 +45,15 @@ impl WebhookConfig {
 
 impl Default for WebhookConfig {
     fn default() -> Self {
-        Self { listen: "9.9.9.9:1111".parse().unwrap(), sync_interval: Default::default(), sync_standoff_time: Default::default(), sync_timeout: Default::default(), secret: Default::default(), cert: Default::default(), key: Default::default() }
+        Self {
+            listen: "9.9.9.9:1111".parse().unwrap(),
+            sync_interval: Default::default(),
+            sync_standoff_time: Default::default(),
+            sync_timeout: Default::default(),
+            secret: Default::default(),
+            cert: Default::default(),
+            key: Default::default(),
+        }
     }
 }
 
@@ -87,38 +95,47 @@ mod tests {
     }
 
     #[test]
-    fn it_returns_sync_interval_as_durations () {
-        let cfg = WebhookConfig {sync_interval: Some(42), ..Default::default()};
+    fn it_returns_sync_interval_as_durations() {
+        let cfg = WebhookConfig {
+            sync_interval: Some(42),
+            ..Default::default()
+        };
         assert_eq!(cfg.sync_interval(), chrono::Duration::seconds(42))
-    } 
+    }
 
     #[test]
     fn it_returns_sync_interval_default () {
-        let cfg = WebhookConfig {..Default::default()};
+        let cfg = WebhookConfig::default();
         assert_eq!(cfg.sync_interval(), chrono::Duration::seconds(900))
-    } 
+    }
 
     #[test]
-    fn it_returns_sync_standoff_time_as_durations () {
-        let cfg = WebhookConfig {sync_standoff_time: Some(42), ..Default::default()};
+    fn it_returns_sync_standoff_time_as_durations() {
+        let cfg = WebhookConfig {
+            sync_standoff_time: Some(42),
+            ..Default::default()
+        };
         assert_eq!(cfg.sync_standoff_time(), Duration::from_secs(42))
     }
 
     #[test]
-    fn it_returns_sync_standoff_time_default () {
-        let cfg = WebhookConfig {..Default::default()};
+    fn it_returns_sync_standoff_time_default() {
+        let cfg = WebhookConfig::default();
         assert_eq!(cfg.sync_standoff_time(), Duration::from_secs(5))
     }
 
     #[test]
-    fn it_returns_sync_timeout_as_durations () {
-        let cfg = WebhookConfig {sync_timeout: Some(42), ..Default::default()};
+    fn it_returns_sync_timeout_as_durations() {
+        let cfg = WebhookConfig {
+            sync_timeout: Some(42),
+            ..Default::default()
+        };
         assert_eq!(cfg.sync_timeout(), Duration::from_secs(42))
     }
 
     #[test]
     fn it_returns_sync_timeout_default () {
-        let cfg = WebhookConfig {..Default::default()};
+        let cfg = WebhookConfig::default();
         assert_eq!(cfg.sync_timeout(), Duration::from_secs(60))
     }
 }

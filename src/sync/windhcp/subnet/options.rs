@@ -1,6 +1,9 @@
-use std::{net::Ipv4Addr, ptr, os::raw::c_void};
+use std::{net::Ipv4Addr, os::raw::c_void, ptr};
 
-use windows::{core::{PCWSTR, PWSTR}, Win32::NetworkManagement::Dhcp::*};
+use windows::{
+    core::{PCWSTR, PWSTR},
+    Win32::NetworkManagement::Dhcp::*,
+};
 
 use crate::sync::windhcp::{WinDhcpError, WinDhcpResult};
 
@@ -40,19 +43,23 @@ impl SubnetOptions<u32> for Subnet {
             ScopeInfo: DHCP_OPTION_SCOPE_INFO_0 { SubnetScopeInfo: self.subnetaddress },
         };
 
-        match unsafe { DhcpGetOptionValueV5(&self.serveripaddress,
-            0x00,
-            optionid,
-            PCWSTR::null(),
-            PCWSTR::null(),
-            &mut scopeinfo,
-            &mut optionvalue) } {
-                0 => (),
-                2 => return Ok(Vec::new()),
-                e => return Err(WinDhcpError::new("getting option", e)),
+        match unsafe {
+            DhcpGetOptionValueV5(
+                &self.serveripaddress,
+                0x00,
+                optionid,
+                PCWSTR::null(),
+                PCWSTR::null(),
+                &mut scopeinfo,
+                &mut optionvalue,
+            )
+        } {
+            0 => (),
+            2 => return Ok(Vec::new()),
+            e => return Err(WinDhcpError::new("getting option", e)),
         }
 
-        let len = unsafe{ (*optionvalue).Value.NumElements };
+        let len = unsafe { (*optionvalue).Value.NumElements };
 
         let mut values = Vec::with_capacity(len as usize);
 
@@ -94,14 +101,17 @@ impl SubnetOptions<u32> for Subnet {
             Elements: values.as_mut_ptr(),
         };
 
-        match unsafe { DhcpSetOptionValueV5(&self.serveripaddress,
-            0x00,
-            optionid,
-            PCWSTR::null(),
-            PCWSTR::null(),
-            &mut scopeinfo,
-            &mut optionvalue,
-        ) } {
+        match unsafe {
+            DhcpSetOptionValueV5(
+                &self.serveripaddress,
+                0x00,
+                optionid,
+                PCWSTR::null(),
+                PCWSTR::null(),
+                &mut scopeinfo,
+                &mut optionvalue,
+            )
+        } {
             0 => Ok(()),
             e => Err(WinDhcpError::new("setting option", e)),
         }
@@ -117,19 +127,23 @@ impl SubnetOptions<Ipv4Addr> for Subnet {
             ScopeInfo: DHCP_OPTION_SCOPE_INFO_0 { SubnetScopeInfo: self.subnetaddress },
         };
 
-        match unsafe { DhcpGetOptionValueV5(&self.serveripaddress,
-            0x00,
-            optionid,
-            PCWSTR::null(),
-            PCWSTR::null(),
-            &mut scopeinfo,
-            &mut optionvalue) } {
-                0 => (),
-                2 => return Ok(Vec::new()),
-                e => return Err(WinDhcpError::new("getting option", e)),
+        match unsafe {
+            DhcpGetOptionValueV5(
+                &self.serveripaddress,
+                0x00,
+                optionid,
+                PCWSTR::null(),
+                PCWSTR::null(),
+                &mut scopeinfo,
+                &mut optionvalue,
+            )
+        } {
+            0 => (),
+            2 => return Ok(Vec::new()),
+            e => return Err(WinDhcpError::new("getting option", e)),
         }
 
-        let len = unsafe{ (*optionvalue).Value.NumElements };
+        let len = unsafe { (*optionvalue).Value.NumElements };
 
         let mut ips = Vec::with_capacity(len as usize);
 
@@ -161,7 +175,7 @@ impl SubnetOptions<Ipv4Addr> for Subnet {
             DHCP_OPTION_DATA_ELEMENT {
                 OptionType: DhcpIpAddressOption,
                 Element: DHCP_OPTION_DATA_ELEMENT_0 {
-                    IpAddressOption: u32::from(*i)
+                    IpAddressOption: u32::from(*i),
                 },
             }
         ).collect::<Vec<DHCP_OPTION_DATA_ELEMENT>>();
@@ -171,14 +185,17 @@ impl SubnetOptions<Ipv4Addr> for Subnet {
             Elements: values.as_mut_ptr(),
         };
 
-        match unsafe { DhcpSetOptionValueV5(&self.serveripaddress,
-            0x00,
-            optionid,
-            PCWSTR::null(),
-            PCWSTR::null(),
-            &mut scopeinfo,
-            &mut optionvalue,
-        ) } {
+        match unsafe {
+            DhcpSetOptionValueV5(
+                &self.serveripaddress,
+                0x00,
+                optionid,
+                PCWSTR::null(),
+                PCWSTR::null(),
+                &mut scopeinfo,
+                &mut optionvalue,
+            )
+        } {
             0 => Ok(()),
             e => Err(WinDhcpError::new("setting option", e)),
         }
@@ -195,19 +212,23 @@ impl SubnetOptions<String> for Subnet {
             ScopeInfo: DHCP_OPTION_SCOPE_INFO_0 { SubnetScopeInfo: self.subnetaddress },
         };
 
-        match unsafe { DhcpGetOptionValueV5(&self.serveripaddress,
-            0x00,
-            optionid,
-            PCWSTR::null(),
-            PCWSTR::null(),
-            &mut scopeinfo,
-            &mut optionvalue) } {
-                0 => (),
-                2 => return Ok(Vec::new()),
-                e => return Err(WinDhcpError::new("getting option", e)),
+        match unsafe {
+            DhcpGetOptionValueV5(
+                &self.serveripaddress,
+                0x00,
+                optionid,
+                PCWSTR::null(),
+                PCWSTR::null(),
+                &mut scopeinfo,
+                &mut optionvalue,
+            )
+        } {
+            0 => (),
+            2 => return Ok(Vec::new()),
+            e => return Err(WinDhcpError::new("getting option", e)),
         }
 
-        let len = unsafe{ (*optionvalue).Value.NumElements };
+        let len = unsafe { (*optionvalue).Value.NumElements };
 
         let mut strings = Vec::with_capacity(len as usize);
 
@@ -253,14 +274,17 @@ impl SubnetOptions<String> for Subnet {
             Elements: values.as_mut_ptr(),
         };
 
-        match unsafe { DhcpSetOptionValueV5(&self.serveripaddress,
-            0x00,
-            optionid,
-            PCWSTR::null(),
-            PCWSTR::null(),
-            &mut scopeinfo,
-            &mut optionvalue,
-        ) } {
+        match unsafe {
+            DhcpSetOptionValueV5(
+                &self.serveripaddress,
+                0x00,
+                optionid,
+                PCWSTR::null(),
+                PCWSTR::null(),
+                &mut scopeinfo,
+                &mut optionvalue,
+            )
+        } {
             0 => Ok(()),
             e => Err(WinDhcpError::new("setting option", e)),
         }

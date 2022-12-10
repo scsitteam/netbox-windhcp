@@ -19,7 +19,7 @@ impl IpRange {
     pub fn end_address(&self) -> Ipv4Addr {
         self.end_address.addr()
     }
-    
+
     pub fn is_contained(&self, prefix: &Prefix) -> bool {
         prefix.prefix().contains(&self.start_address) && prefix.prefix().contains(&self.end_address)
     }
