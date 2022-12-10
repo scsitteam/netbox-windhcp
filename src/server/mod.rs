@@ -1,6 +1,6 @@
 pub mod config;
 mod interval;
-#[cfg(windows)]
+#[cfg(target_os = "windows")]
 pub mod service;
 mod shared;
 mod signal;

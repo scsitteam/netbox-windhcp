@@ -1,6 +1,6 @@
 use log::error;
 use netbox_windhcp::Config;
-#[cfg(windows)]
+#[cfg(target_os = "windows")]
 use netbox_windhcp::{cli, Sync};
 
 #[tokio::main]
@@ -15,15 +15,15 @@ async fn main() {
 
     config.log.setup("sync");
 
-    #[cfg(windows)]
+    #[cfg(target_os = "windows")]
     let cli_args = cli::Sync::init();
 
-    #[cfg(windows)]
+    #[cfg(target_os = "windows")]
     match Sync::new(config.sync, cli_args.noop).run().await {
         Ok(_) => {}
         Err(e) => error!("{}", e),
     }
 
-    #[cfg(not(windows))]
+    #[cfg(not(target_os = "windows"))]
     error!("Only works on Windows");
 }

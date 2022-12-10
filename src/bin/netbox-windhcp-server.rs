@@ -11,13 +11,13 @@ fn main() {
 
     config.log.setup("server");
 
-    #[cfg(windows)]
+    #[cfg(target_os = "windows")]
     let service = server::service::running_as_service();
-    #[cfg(not(windows))]
+    #[cfg(not(target_os = "windows"))]
     let service = false;
 
     if service {
-        #[cfg(windows)]
+        #[cfg(target_os = "windows")]
         server::service::run();
     } else {
         server::run(None);
