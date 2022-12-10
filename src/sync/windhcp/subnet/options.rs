@@ -8,7 +8,7 @@ use super::Subnet;
 
 pub trait SubnetOptions<T> {
     fn get_options(&self, optionid: u32) -> WinDhcpResult<Vec<T>>;
-    fn set_options(&self, optionid: u32, values: &Vec<T>) -> WinDhcpResult<()>;
+    fn set_options(&self, optionid: u32, values: &[T]) -> WinDhcpResult<()>;
 }
 pub trait SubnetOption<T: Clone>: SubnetOptions<T> {
     fn get_option(&self, optionid: u32) -> WinDhcpResult<Option<T>> {
@@ -23,9 +23,9 @@ pub trait SubnetOption<T: Clone>: SubnetOptions<T> {
     fn set_option(&self, optionid: u32, value: Option<&T>) -> WinDhcpResult<()> {
         match value {
             Some(value) => {
-                self.set_options(optionid, &vec!(value.clone()))
+                self.set_options(optionid, &[value.clone()])
             },
-            None => self.set_options(optionid, &vec!()),
+            None => self.set_options(optionid, &[]),
         }
     }
 }
@@ -68,7 +68,7 @@ impl SubnetOptions<u32> for Subnet {
         Ok(values)
     }
 
-    fn set_options(&self, optionid: u32, set_values: &Vec<u32>) -> WinDhcpResult<()> {
+    fn set_options(&self, optionid: u32, set_values: &[u32]) -> WinDhcpResult<()> {
         if set_values.is_empty() {
             return self.remove_option(optionid).map_err(|e|
                 WinDhcpError::new("removing option", e)
@@ -84,7 +84,7 @@ impl SubnetOptions<u32> for Subnet {
             DHCP_OPTION_DATA_ELEMENT {
                 OptionType: DhcpDWordOption,
                 Element: DHCP_OPTION_DATA_ELEMENT_0 {
-                    IpAddressOption: u32::from(*i),
+                    IpAddressOption: *i,
                 },
             }
         ).collect::<Vec<DHCP_OPTION_DATA_ELEMENT>>();
@@ -145,7 +145,7 @@ impl SubnetOptions<Ipv4Addr> for Subnet {
         Ok(ips)
     }
 
-    fn set_options(&self, optionid: u32, set_values: &Vec<Ipv4Addr>) -> WinDhcpResult<()> {
+    fn set_options(&self, optionid: u32, set_values: &[Ipv4Addr]) -> WinDhcpResult<()> {
         if set_values.is_empty() {
             return self.remove_option(optionid).map_err(|e|
                 WinDhcpError::new("removing option", e)
@@ -223,7 +223,7 @@ impl SubnetOptions<String> for Subnet {
         Ok(strings)
     }
 
-    fn set_options(&self, optionid: u32, set_values: &Vec<String>) -> WinDhcpResult<()> {
+    fn set_options(&self, optionid: u32, set_values: &[String]) -> WinDhcpResult<()> {
         if set_values.is_empty() {
             return self.remove_option(optionid).map_err(|e|
                 WinDhcpError::new("removing option", e)

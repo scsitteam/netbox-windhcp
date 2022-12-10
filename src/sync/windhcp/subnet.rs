@@ -477,6 +477,7 @@ impl Subnet {
     }
 
     pub fn get_dns_flags(&self) -> WinDhcpResult<Option<DnsFlags>> {
+        #[allow(clippy::redundant_closure)]
         Ok(self.get_option(81)?
             .map(|f: u32| DnsFlags::from(f)))
     }
@@ -489,7 +490,7 @@ impl Subnet {
         self.get_options(OPTION_ROUTER_ADDRESS)
     }
 
-    pub fn set_routers(&self, routers: &Vec<Ipv4Addr>) -> WinDhcpResult<()> {
+    pub fn set_routers(&self, routers: &[Ipv4Addr]) -> WinDhcpResult<()> {
         self.set_options(OPTION_ROUTER_ADDRESS, routers)
     }
 
@@ -505,7 +506,7 @@ impl Subnet {
         self.get_options(OPTION_DOMAIN_NAME_SERVERS)
     }
 
-    pub fn set_dns_servers(&self, servers: &Vec<Ipv4Addr>) -> WinDhcpResult<()> {
+    pub fn set_dns_servers(&self, servers: &[Ipv4Addr]) -> WinDhcpResult<()> {
         self.set_options(OPTION_DOMAIN_NAME_SERVERS, servers)
     }
     

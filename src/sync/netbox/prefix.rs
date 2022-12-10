@@ -36,10 +36,9 @@ impl Prefix {
     }
 
     pub fn routers(&self) -> Option<Vec<Ipv4Addr>> {
-        match &self.custom_fields.dhcp_routers {
-            Some(routers) => Some(routers.iter().map(|n| n.address.addr()).collect::<Vec<Ipv4Addr>>()),
-            None => None,
-        }
+        self.custom_fields.dhcp_routers.as_ref()
+            .map(|routers| routers.iter().map(|n| n.address.addr())
+            .collect::<Vec<Ipv4Addr>>())
     }
 
     pub fn dns_domain(&self) -> Option<&String> {
@@ -47,10 +46,9 @@ impl Prefix {
     }
 
     pub fn dns_servers(&self) -> Option<Vec<Ipv4Addr>> {
-        match &self.custom_fields.dhcp_dns_servers {
-            Some(dns) => Some(dns.iter().map(|n| n.address.addr()).collect::<Vec<Ipv4Addr>>()),
-            None => None,
-        }
+        self.custom_fields.dhcp_dns_servers.as_ref()
+            .map(|dns| dns.iter().map(|n| n.address.addr())
+            .collect::<Vec<Ipv4Addr>>())
     }
 }
 
