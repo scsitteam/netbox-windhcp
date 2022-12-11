@@ -22,10 +22,12 @@ impl Default for SyncNetboxConfig {
             prefix_filter: HashMap::from([
                 (String::from("tag"), String::from("dhcp")),
                 (String::from("status"), String::from("active")),
+                (String::from("family"), String::from("4")),
             ]),
             range_filter: HashMap::from([
                 (String::from("role"), String::from("dhcp-pool")),
                 (String::from("status"), String::from("active")),
+                (String::from("family"), String::from("4")),
             ]),
             reservation_filter: HashMap::from([
                 (String::from("tag"), String::from("dhcp")),
