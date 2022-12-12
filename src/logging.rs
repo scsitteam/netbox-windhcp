@@ -11,6 +11,7 @@ use serde::Deserialize;
 
 #[derive(Debug, Deserialize)]
 pub struct LogConfig {
+    #[serde(default = "LogConfig::default_dir")]
     dir: Option<PathBuf>,
     #[serde(default = "LogConfig::default_levelfilter")]
     level: LevelFilter,
@@ -18,7 +19,12 @@ pub struct LogConfig {
 
 impl Default for LogConfig {
     fn default() -> Self {
-        Self { dir: None, level: LevelFilter::Info, }
+        #[cfg(debug_assertions)]
+        let dir = None;
+        #[cfg(not(debug_assertions))]
+        let dir = Some(PathBuf::from(concat!("C:\\ProgramData\\", env!("CARGO_PKG_NAME"))));
+
+        Self { dir, level: LevelFilter::Info, }
     }
 }
 
@@ -50,6 +56,10 @@ impl LogConfig {
         }
 
         config.build(root.build(self.level)).unwrap()
+    }
+
+    fn default_dir() -> Option<PathBuf> {
+        Self::default().dir
     }
 
     fn default_levelfilter() -> LevelFilter {

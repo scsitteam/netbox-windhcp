@@ -20,13 +20,13 @@ pub struct Config {
 
 impl Config {
     #[cfg(debug_assertions)]
-    const CONFIG_FILE: &str = concat!("./", env!("CARGO_CRATE_NAME"), ".cfg");
+    const CONFIG_FILE: &str = concat!("./", env!("CARGO_PKG_NAME"), ".cfg");
     #[cfg(not(debug_assertions))]
     const CONFIG_FILE: &str = concat!(
         "C:\\ProgramData\\",
-        env!(CARGO_CRATE_NAME),
+        env!("CARGO_PKG_NAME"),
         "\\",
-        env!(CARGO_CRATE_NAME),
+        env!("CARGO_PKG_NAME"),
         ".cfg"
     );
 
