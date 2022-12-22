@@ -14,6 +14,8 @@ use tokio::{
     time::{error::Elapsed, sleep, Instant},
 };
 
+use crate::server::shared::SyncStatus;
+
 use super::{
     config::WebhookConfig,
     shared::{Message, SharedServerStatus},
@@ -78,6 +80,7 @@ pub async fn worker(
                             let mut status = status.lock().await;
                             status.syncing = false;
                             status.last_sync = Some(Utc::now());
+                            status.last_sync_status = SyncStatus::SyncOk;
                         }
                     }
                     Err(e) => {
@@ -86,6 +89,7 @@ pub async fn worker(
                             let mut status = status.lock().await;
                             status.syncing = false;
                             status.last_sync = Some(Utc::now());
+                            status.last_sync_status = SyncStatus::SyncFailed;
                         }
                     }
                 }

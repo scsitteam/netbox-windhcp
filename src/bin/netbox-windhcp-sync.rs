@@ -9,7 +9,7 @@ async fn main() {
         Ok(config) => config,
         Err(e) => {
             println!("Error reading config: {}", e);
-            return;
+            std::process::exit(exitcode::CONFIG);
         }
     };
 
@@ -20,10 +20,16 @@ async fn main() {
 
     #[cfg(target_os = "windows")]
     match Sync::new(config.sync, cli_args.noop).run().await {
-        Ok(_) => {}
-        Err(e) => error!("{}", e),
+        Ok(_) => std::process::exit(exitcode::OK),
+        Err(e) => {
+            error!("{}", e);
+            std::process::exit(exitcode::DATAERR);
+        }
     }
 
     #[cfg(not(target_os = "windows"))]
-    error!("Only works on Windows");
+    {
+        error!("Only works on Windows");
+        std::process::exit(exitcode::DATAERR);
+    }
 }

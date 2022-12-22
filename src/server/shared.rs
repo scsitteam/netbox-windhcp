@@ -5,10 +5,19 @@ use serde::Serialize;
 use tokio::sync::Mutex;
 
 #[derive(Debug, Default, Serialize)]
+pub enum SyncStatus {
+    #[default]
+    Unknown,
+    SyncOk,
+    SyncFailed,
+}
+
+#[derive(Debug, Default, Serialize)]
 pub struct ServerStatus {
     pub needs_sync: bool,
     pub syncing: bool,
     pub last_sync: Option<DateTime<Utc>>,
+    pub last_sync_status: SyncStatus,
 }
 
 impl ServerStatus {
