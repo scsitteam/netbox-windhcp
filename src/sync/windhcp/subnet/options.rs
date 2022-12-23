@@ -151,7 +151,6 @@ impl SubnetOptions<Ipv4Addr> for Subnet {
             let element = unsafe{ (*optionvalue).Value.Elements.offset(idx.try_into().unwrap()) };
             let value = unsafe{ (*element).Element.IpAddressOption };
             ips.push(Ipv4Addr::from(value));
-            unsafe { DhcpRpcFreeMemory(element as *mut c_void) };
         }
 
         unsafe { DhcpRpcFreeMemory(optionvalue as *mut c_void) };
