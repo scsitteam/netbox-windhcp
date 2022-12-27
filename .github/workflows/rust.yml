@@ -20,3 +20,17 @@ jobs:
       run: cargo build --verbose
     - name: Run tests
       run: cargo test --verbose
+    - uses: actions/upload-artifact@v3
+      with:
+        name: binaries
+        path: target\release\*.exe
+    - name: Build MSI
+      run: cargo wix
+    - uses: actions/upload-artifact@v3
+      with:
+        name: binaries
+        path: target\release\*.exe
+    - uses: actions/upload-artifact@v3
+      with:
+        name: msi
+        path: target\wix\*.msi

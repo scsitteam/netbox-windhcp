@@ -64,7 +64,7 @@
             <Directory Id="CommonAppDataFolder" Name="PData">
                 <Directory Id="APPDATA" Name="netbox-windhcp">
                     <Component Id="netbox_windhcp_config" Guid="*">
-                        <File Id="cfg0" Name="netbox-windhcp.cfg" DiskId="1" Source="netbox_windhcp.cfg" KeyPath="yes" />
+                        <File Id="cfg0" Name="netbox-windhcp.cfg" DiskId="1" Source="netbox-windhcp.cfg" KeyPath="yes" />
                     </Component>
                 </Directory>
             </Directory>
