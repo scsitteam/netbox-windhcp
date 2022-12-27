@@ -72,12 +72,12 @@
                 <Directory Id="APPLICATIONFOLDER" Name="netbox-windhcp">
                     <Component Id="netbox_windhcp_server" Guid="*">
                         <File Id="exe0" Name="netbox-windhcp-server.exe" DiskId="1" Source="$(var.CargoTargetBinDir)\netbox-windhcp-server.exe" KeyPath="yes" />
+                        <ServiceInstall Id="netbox_windhcp_service" Name="netbox-windhcp-server" DisplayName="Netbox WinDHCP Sync Server" Description="Netbox WinDHCP Sync Webhook receiver" Start="auto" Type="ownProcess" ErrorControl="normal" Account="LocalSystem" Vital="yes" Interactive="no"/>
+                        <ServiceControl Id="netbox_windhcp_service" Name="netbox-windhcp-server" Stop="both" Remove="uninstall" Wait="yes"/>
+                        <ServiceConfig ServiceName="netbox-windhcp-server" OnInstall="yes" DelayedAutoStart="yes"/>
                     </Component>
                     <Component Id="netbox_windhcp_sync" Guid="*">
                         <File Id="exe1" Name="netbox-windhcp-sync.exe" DiskId="1" Source="$(var.CargoTargetBinDir)\netbox-windhcp-sync.exe" KeyPath="yes" />
-                        <ServiceInstall Id="netbox_windhcp_service" Name="netbox-windhcp-sync" DisplayName="Netbox WinDHCP Sync Server" Description="Netbox WinDHCP Sync Webhook receiver" Start="auto" Type="ownProcess" ErrorControl="normal" Account="LocalSystem" Vital="yes" Interactive="no"/>
-                        <ServiceControl Id="netbox_windhcp_service" Name="netbox-windhcp-sync" Stop="both" Remove="uninstall" Wait="yes"/>
-                        <ServiceConfig ServiceName="netbox-windhcp-sync" OnInstall="yes" DelayedAutoStart="yes"/>
                     </Component>
                 </Directory>
             </Directory>
