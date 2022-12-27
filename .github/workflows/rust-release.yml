@@ -16,12 +16,7 @@ jobs:
     steps:
     - uses: actions/checkout@v3
     - name: Cache Cargo
-      uses: actions/cache@v3
-      with:
-        key: ${{ runner.os }}
-        path: |
-          ~/.cargo
-          ./target
+      uses: Swatinem/rust-cache@v2
     - name: Build
       run: cargo build --release --verbose
     - name: Install Cargo Wix
