@@ -23,14 +23,12 @@ jobs:
     - uses: actions/upload-artifact@v3
       with:
         name: binaries
-        path: target\release\*.exe
+        path: target\\release\\*.exe
+    - name: Install Cargo Wix
+      run: cargo install cargo-wix
     - name: Build MSI
       run: cargo wix
     - uses: actions/upload-artifact@v3
       with:
-        name: binaries
-        path: target\release\*.exe
-    - uses: actions/upload-artifact@v3
-      with:
         name: msi
-        path: target\wix\*.msi
+        path: target\\wix\\*.msi

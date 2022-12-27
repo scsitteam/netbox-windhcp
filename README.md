@@ -38,6 +38,7 @@ sync:
             enabled: true
             cleanup_expired: true
             update_dhcid: true
+        last_used: true
     netbox:
         apiurl: https://netbox.example.ch/api/
         token: XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
@@ -53,3 +54,10 @@ log:
     dir: C:\ProgramData\netbox_windhcp\
     level: Info
 ```
+
+# Development
+
+ * Install Rust with Rust-Up
+ * Compile with `cargo build`
+ * Test run with `cargo run --bin netbox-windhcp-sync -- --noop`
+ * Build MSI with `cargo wix`
