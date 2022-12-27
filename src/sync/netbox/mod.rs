@@ -1,10 +1,13 @@
 pub(super) mod model;
 
 use std::collections::HashMap;
+use std::net::Ipv4Addr;
 
+use chrono::Utc;
 use ipnet::Ipv4Net;
-use log::debug;
+use log::{debug, warn};
 use serde::Deserialize;
+use serde_json::json;
 
 pub mod config;
 use self::config::SyncNetboxConfig;
@@ -72,6 +75,39 @@ impl NetboxApi {
 
     pub async fn get_router_for_subnet(&self, subnet: &Ipv4Net) -> reqwest::Result<Vec<IpAddress>> {
         self.get_objects("ipam/ip-addresses/", &self.config.router_filter(subnet)).await
+    }
+
+    pub async fn set_ip_last_active(&self, ip: Ipv4Addr, subnet: Ipv4Net) -> reqwest::Result<()> {
+        let filter: HashMap<String, String> = HashMap::from([
+            (String::from("address"), ip.to_string()),
+            (String::from("mask_length"), subnet.prefix_len().to_string())
+        ]);
+
+        let ips: Vec<IpAddress> = self.get_objects("ipam/ip-addresses/", &filter).await?;
+
+        if ips.len() != 1 {
+            warn!("Not exactly one IPAddress foudn for ip {}", ip);
+            return Ok(())
+        }
+
+        if ips[0].dhcp_reservation_last_active() == Some(Utc::now().date_naive()) {
+            debug!("Skip last_active update for {}", ips[0].address());
+            return Ok(())
+        }
+
+        let payload = json!({
+            "custom_fields": {
+                "dhcp_reservation_last_active": Utc::now().date_naive().to_string(),
+            }
+        });
+
+        self.client.patch(ips[0].url())
+            .body(payload.to_string())
+            .header("Content-Type", "application/json")
+            .send().await?
+            .error_for_status()?;
+
+        Ok(())
     }
 
     async fn get_objects<T: for<'a> Deserialize<'a>>(

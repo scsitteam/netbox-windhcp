@@ -613,6 +613,48 @@ impl Subnet {
             e => Err(WinDhcpError::new("removing reservation", e)),
         }
     }
+
+    pub fn get_clients_state(&self) -> WinDhcpResult<HashMap<Ipv4Addr, u8>> {
+        let mut resumehandle: u32 = 0;
+        let mut clientsread: u32 = 0;
+        let mut clientstotal: u32 = 0;
+
+        let mut clientinfo: *mut DHCP_CLIENT_INFO_ARRAY_V5 = ptr::null_mut();
+
+        match unsafe {
+            DhcpEnumSubnetClientsV5(
+                &self.serveripaddress,
+                self.subnetaddress,
+                &mut resumehandle,
+                0xFFFFFFFF,
+                &mut clientinfo,
+                &mut clientsread,
+                &mut clientstotal
+            )
+        } {
+            0 => (),
+            //ERROR_NO_MORE_ITEMS
+            259 => {
+                return Ok(HashMap::with_capacity(0));
+            }
+            e => return Err(WinDhcpError::new("listing clients", e)),
+        }
+        
+        let mut ret = HashMap::with_capacity(unsafe{*clientinfo}.NumElements as usize);
+
+        for idx in 0..unsafe{*clientinfo}.NumElements {
+            let client = unsafe { **(*clientinfo).Clients.offset(idx.try_into().unwrap()) };
+
+            if (client.bClientType & 0x04) == 0x00 {
+                continue
+            }
+
+            ret.insert(Ipv4Addr::from(client.ClientIpAddress), client.AddressState);
+        }
+        unsafe { DhcpRpcFreeMemory((*clientinfo).Clients as *mut c_void); };
+
+        Ok(ret)
+    }
 }
 
 #[derive(Debug, PartialEq, Eq)]

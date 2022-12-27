@@ -1,6 +1,6 @@
 use std::net::Ipv4Addr;
 
-use log::{debug, info, warn};
+use log::{debug, info, warn, error};
 
 pub mod config;
 use self::netbox::address::{AssignedObject, IpAddress};
@@ -66,6 +66,17 @@ impl Sync {
             for (reservationaddress, macaddress) in dhcp_reservations {
                 if !self.noop { subnet.remove_reservation(reservationaddress, &macaddress)?; }
                 info!("  Reservation {}: Remove Reservation {}", &reservationaddress, &macaddress.as_mac());
+            }
+
+            /* Update Reservation Last Use */
+            if self.config.netbox.last_used() {
+                for (ip, state) in subnet.get_clients_state()? {
+                    if (state & 0xF0) == 0x00 { continue; }
+                    match self.netbox.set_ip_last_active(ip, prefix.prefix()).await {
+                        Ok(_) => {},
+                        Err(_) => error!("  Reservation {}: Updating last used.", ip),
+                    }
+                }
             }
         }
 
