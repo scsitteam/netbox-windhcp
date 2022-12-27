@@ -29,6 +29,6 @@ jobs:
       if: startsWith(github.ref, 'refs/tags/')
       with:
         files: |
-          LICENSE
-          target\\release\\*.exe
-          target\\wix\\*.msi
+          LICENSE.md
+          target/release/*.exe
+          target/wix/*.msi
