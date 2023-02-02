@@ -5,7 +5,7 @@ edition = "2021"
 
 [features]
 # Defines a feature named `webp` that does not enable any other features.
-no_rpc_free = []
+rpc_free = []
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 

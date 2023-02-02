@@ -1,6 +1,6 @@
 use log::debug;
 use std::net::Ipv4Addr;
-#[cfg(not(feature = "no_rpc_free"))]
+#[cfg(feature = "rpc_free")]
 use std::os::raw::c_void;
 use std::ptr;
 use std::sync::atomic::{AtomicUsize, Ordering};
@@ -77,7 +77,7 @@ impl WinDhcp {
             subnets.push(Ipv4Addr::from(unsafe { *data.Elements.offset(idx.try_into().unwrap()) }));
         }
 
-        #[cfg(not(feature = "no_rpc_free"))]
+        #[cfg(feature = "rpc_free")]
         unsafe {
             DhcpRpcFreeMemory((*enuminfo).Elements as *mut c_void);
             DhcpRpcFreeMemory(enuminfo as *mut c_void);
@@ -131,7 +131,7 @@ impl WinDhcp {
             false => unsafe { info.ClientName.to_string() }.unwrap_or_default(),
         };
 
-        #[cfg(not(feature = "no_rpc_free"))]
+        #[cfg(feature = "rpc_free")]
         unsafe {
             DhcpRpcFreeMemory((*clientinfo).ClientName.as_ptr() as *mut c_void);
             DhcpRpcFreeMemory((*clientinfo).ClientComment.as_ptr() as *mut c_void);
@@ -166,7 +166,7 @@ impl WinDhcp {
             e => Err(WinDhcpError::new("setting client name", e)),
         };
 
-        #[cfg(not(feature = "no_rpc_free"))]
+        #[cfg(feature = "rpc_free")]
         unsafe {
             DhcpRpcFreeMemory((*clientinfo).ClientName.as_ptr() as *mut c_void);
             DhcpRpcFreeMemory((*clientinfo).ClientComment.as_ptr() as *mut c_void);
@@ -200,7 +200,7 @@ impl WinDhcp {
             false => unsafe { info.ClientComment.to_string() }.unwrap_or_default(),
         };
 
-        #[cfg(not(feature = "no_rpc_free"))]
+        #[cfg(feature = "rpc_free")]
         unsafe {
             DhcpRpcFreeMemory((*clientinfo).ClientName.as_ptr() as *mut c_void);
             DhcpRpcFreeMemory((*clientinfo).ClientComment.as_ptr() as *mut c_void);
@@ -235,7 +235,7 @@ impl WinDhcp {
             e => Err(WinDhcpError::new("setting client name", e)),
         };
 
-        #[cfg(not(feature = "no_rpc_free"))]
+        #[cfg(feature = "rpc_free")]
         unsafe {
             DhcpRpcFreeMemory((*clientinfo).ClientName.as_ptr() as *mut c_void);
             DhcpRpcFreeMemory((*clientinfo).ClientComment.as_ptr() as *mut c_void);

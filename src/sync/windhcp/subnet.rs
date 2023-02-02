@@ -1,7 +1,7 @@
 use log::debug;
 use serde::Deserialize;
 use std::{collections::HashMap, fmt, net::Ipv4Addr, ptr};
-#[cfg(not(feature = "no_rpc_free"))]
+#[cfg(feature = "rpc_free")]
 use std::ffi::c_void;
 use windows::{
     core::{HSTRING, PCWSTR, PWSTR},
@@ -73,7 +73,7 @@ impl Subnet {
 
         let data: DHCP_SUBNET_ELEMENT_INFO_ARRAY_V5 = unsafe { *enumelementinfo };
 
-        #[cfg(not(feature = "no_rpc_free"))]
+        #[cfg(feature = "rpc_free")]
         unsafe { DhcpRpcFreeMemory(enumelementinfo as *mut c_void); };
 
         Ok(Some(data))
@@ -109,7 +109,7 @@ impl Subnet {
 
         let data: DHCP_SUBNET_ELEMENT_DATA_V5 = unsafe { *(*enumelementinfo).Elements };
 
-        #[cfg(not(feature = "no_rpc_free"))]
+        #[cfg(feature = "rpc_free")]
         if unsafe { (*enumelementinfo).NumElements } > 1 {
             for idx in 1..unsafe { (*enumelementinfo).NumElements } {
                 let ptr = unsafe { (*enumelementinfo).Elements.offset(idx.try_into().unwrap()) };
@@ -120,7 +120,7 @@ impl Subnet {
             }
         }
         
-        #[cfg(not(feature = "no_rpc_free"))]
+        #[cfg(feature = "rpc_free")]
         unsafe {
             DhcpRpcFreeMemory((*enumelementinfo).Elements as *mut c_void); 
             DhcpRpcFreeMemory(enumelementinfo as *mut c_void);
@@ -184,7 +184,7 @@ impl Subnet {
             n => Err(n),
         };
 
-        #[cfg(not(feature = "no_rpc_free"))]
+        #[cfg(feature = "rpc_free")]
         unsafe { DhcpRpcFreeMemory(subnetinfo as *mut c_void) };
 
         ret
@@ -370,7 +370,7 @@ impl Subnet {
                 Vec::from_raw_parts((*reservation.ReservedForClient).Data, vec_len, vec_len)[5..].to_vec().clone()
             });
         }
-        #[cfg(not(feature = "no_rpc_free"))]
+        #[cfg(feature = "rpc_free")]
         unsafe { DhcpRpcFreeMemory(reservations.Elements as *mut c_void); };
 
         Ok(ret)
@@ -476,7 +476,7 @@ impl Subnet {
             ret.insert(Ipv4Addr::from(client.ClientIpAddress), client.AddressState);
         }
 
-        #[cfg(not(feature = "no_rpc_free"))]
+        #[cfg(feature = "rpc_free")]
         unsafe { DhcpRpcFreeMemory((*clientinfo).Clients as *mut c_void); };
 
         Ok(ret)

@@ -1,5 +1,5 @@
 use std::{net::Ipv4Addr, ptr};
-#[cfg(not(feature = "no_rpc_free"))]
+#[cfg(feature = "rpc_free")]
 use std::os::raw::c_void;
 
 use windows::{
@@ -69,11 +69,11 @@ impl SubnetOptions<u32> for Subnet {
             let element = unsafe{ (*optionvalue).Value.Elements.offset(idx.try_into().unwrap()) };
             let value = unsafe{ (*element).Element.IpAddressOption };
             values.push(value);
-            #[cfg(not(feature = "no_rpc_free"))]
+            #[cfg(feature = "rpc_free")]
             unsafe { DhcpRpcFreeMemory(element as *mut c_void) };
         }
 
-        #[cfg(not(feature = "no_rpc_free"))]
+        #[cfg(feature = "rpc_free")]
         unsafe { DhcpRpcFreeMemory(optionvalue as *mut c_void) };
 
         Ok(values)
@@ -157,7 +157,7 @@ impl SubnetOptions<Ipv4Addr> for Subnet {
             ips.push(Ipv4Addr::from(value));
         }
 
-        #[cfg(not(feature = "no_rpc_free"))]
+        #[cfg(feature = "rpc_free")]
         unsafe { DhcpRpcFreeMemory(optionvalue as *mut c_void) };
 
         Ok(ips)
@@ -240,11 +240,11 @@ impl SubnetOptions<String> for Subnet {
             let element = unsafe{ (*optionvalue).Value.Elements.offset(idx.try_into().unwrap()) };
             let value = unsafe{ (*element).Element.StringDataOption.to_string().unwrap_or_default() }.clone();
             strings.push(value);
-            #[cfg(not(feature = "no_rpc_free"))]
+            #[cfg(feature = "rpc_free")]
             unsafe { DhcpRpcFreeMemory(element as *mut c_void) };
         }
 
-        #[cfg(not(feature = "no_rpc_free"))]
+        #[cfg(feature = "rpc_free")]
         unsafe { DhcpRpcFreeMemory(optionvalue as *mut c_void) };
 
         Ok(strings)
