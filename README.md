@@ -53,6 +53,8 @@ sync:
 log:
     dir: C:\ProgramData\netbox_windhcp\
     level: Info
+    max_size: 10240000
+    keep_logs: 10
 ```
 
 # Development

@@ -2,7 +2,7 @@ use std::path::PathBuf;
 
 use log::LevelFilter;
 use log4rs::{
-    append::{console::ConsoleAppender, file::FileAppender},
+    append::{console::ConsoleAppender, rolling_file::{RollingFileAppender, policy::compound::{CompoundPolicy, trigger::size::SizeTrigger, roll::fixed_window::FixedWindowRoller}}},
     config::{Appender, Root},
     encode::pattern::PatternEncoder,
     Config, Handle,
@@ -15,6 +15,10 @@ pub struct LogConfig {
     dir: Option<PathBuf>,
     #[serde(default = "LogConfig::default_levelfilter")]
     level: LevelFilter,
+    #[serde(default = "LogConfig::default_max_size")]
+    max_size: u64,
+    #[serde(default = "LogConfig::default_keep_log")]
+    keep_logs: u32,
 }
 
 impl Default for LogConfig {
@@ -24,7 +28,7 @@ impl Default for LogConfig {
         #[cfg(not(debug_assertions))]
         let dir = Some(PathBuf::from(concat!("C:\\ProgramData\\", env!("CARGO_PKG_NAME"))));
 
-        Self { dir, level: LevelFilter::Info, }
+        Self { dir, level: LevelFilter::Info, max_size: 10*1024*1024, keep_logs: 10 }
     }
 }
 
@@ -45,11 +49,24 @@ impl LogConfig {
         let mut root = Root::builder().appender("stdout");
 
         if let Some(dir) = &self.dir {
-            let logfile = FileAppender::builder()
+            let policy = CompoundPolicy::new(
+                Box::new(SizeTrigger::new(self.max_size)),
+                Box::new(
+                    FixedWindowRoller::builder()
+                        .build(dir.join(format!("{}.{{}}.log", name)).to_str().unwrap(), self.keep_logs)
+                        .unwrap()
+                )
+            );
+
+            let logfile = RollingFileAppender::builder()
+                .append(true)
                 .encoder(Box::new(PatternEncoder::new(
                     "{d(%Y-%m-%d %H:%M:%S)} {l} {t} - {m}{n}",
                 )))
-                .build(dir.join(format!("{}.log", name)))
+                .build(
+                    dir.join(format!("{}.log", name)),
+                    Box::new(policy)
+                )
                 .unwrap();
             config = config.appender(Appender::builder().build("logfile", Box::new(logfile)));
             root = root.appender("logfile");
@@ -64,6 +81,14 @@ impl LogConfig {
 
     fn default_levelfilter() -> LevelFilter {
         LevelFilter::Info
+    }
+
+    fn default_max_size() -> u64 {
+        10*1024*1024
+    }
+
+    fn default_keep_log() -> u32 {
+        10
     }
 }
 
