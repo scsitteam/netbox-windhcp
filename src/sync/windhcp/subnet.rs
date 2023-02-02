@@ -1,5 +1,8 @@
+use log::debug;
 use serde::Deserialize;
-use std::{collections::HashMap, ffi::c_void, fmt, net::Ipv4Addr, ptr};
+use std::{collections::HashMap, fmt, net::Ipv4Addr, ptr};
+#[cfg(not(feature = "no_rpc_free"))]
+use std::ffi::c_void;
 use windows::{
     core::{HSTRING, PCWSTR, PWSTR},
     Win32::NetworkManagement::Dhcp::*,
@@ -70,6 +73,7 @@ impl Subnet {
 
         let data: DHCP_SUBNET_ELEMENT_INFO_ARRAY_V5 = unsafe { *enumelementinfo };
 
+        #[cfg(not(feature = "no_rpc_free"))]
         unsafe { DhcpRpcFreeMemory(enumelementinfo as *mut c_void); };
 
         Ok(Some(data))
@@ -105,17 +109,22 @@ impl Subnet {
 
         let data: DHCP_SUBNET_ELEMENT_DATA_V5 = unsafe { *(*enumelementinfo).Elements };
 
+        #[cfg(not(feature = "no_rpc_free"))]
         if unsafe { (*enumelementinfo).NumElements } > 1 {
             for idx in 1..unsafe { (*enumelementinfo).NumElements } {
                 let ptr = unsafe { (*enumelementinfo).Elements.offset(idx.try_into().unwrap()) };
+                
                 unsafe {
                     DhcpRpcFreeMemory(ptr as *mut c_void);
                 };
             }
         }
-
-        unsafe { DhcpRpcFreeMemory((*enumelementinfo).Elements as *mut c_void); };
-        unsafe { DhcpRpcFreeMemory(enumelementinfo as *mut c_void); };
+        
+        #[cfg(not(feature = "no_rpc_free"))]
+        unsafe {
+            DhcpRpcFreeMemory((*enumelementinfo).Elements as *mut c_void); 
+            DhcpRpcFreeMemory(enumelementinfo as *mut c_void);
+        };
 
         Ok(data)
     }
@@ -126,196 +135,7 @@ impl Subnet {
             n => Err(n),
         }
     }
-/*
-    fn get_option_u32(&self, optionid: u32) -> Result<u32, u32> {
-        let mut optionvalue: *mut DHCP_OPTION_VALUE = ptr::null_mut();
 
-        let mut scopeinfo = DHCP_OPTION_SCOPE_INFO {
-            ScopeType: DhcpSubnetOptions,
-            ScopeInfo: DHCP_OPTION_SCOPE_INFO_0 { SubnetScopeInfo: self.subnetaddress },
-        };
-
-        match unsafe { DhcpGetOptionValueV5(&self.serveripaddress,
-            0x00,
-            optionid,
-            PCWSTR::null(),
-            PCWSTR::null(),
-            &mut scopeinfo,
-            &mut optionvalue) } {
-                0 => (),
-                n => { return Err(n); },
-        }
-
-        let option = unsafe{ (*((*optionvalue).Value.Elements)).Element.DWordOption };
-
-        unsafe { DhcpRpcFreeMemory((*optionvalue).Value.Elements as *mut c_void) };
-        unsafe { DhcpRpcFreeMemory(optionvalue as *mut c_void) };
-
-        Ok(option)
-    }
-
-    fn set_option_u32(&self, optionid: u32, value: u32) -> Result<(), u32> {
-        let mut scopeinfo = DHCP_OPTION_SCOPE_INFO {
-            ScopeType: DhcpSubnetOptions,
-            ScopeInfo: DHCP_OPTION_SCOPE_INFO_0 { SubnetScopeInfo: self.subnetaddress },
-        };
-
-        let mut value = DHCP_OPTION_DATA_ELEMENT {
-            OptionType: DhcpDWordOption,
-            Element: DHCP_OPTION_DATA_ELEMENT_0 {
-                DWordOption: value
-            },
-        };
-
-        let mut optionvalue = DHCP_OPTION_DATA {
-            NumElements: 1,
-            Elements: &mut value
-        };
-
-        match unsafe { DhcpSetOptionValueV5(&self.serveripaddress,
-            0x00,
-            optionid,
-            PCWSTR::null(),
-            PCWSTR::null(),
-            &mut scopeinfo,
-            &mut optionvalue,
-        ) } {
-            0 => Ok(()),
-            n => Err(n),
-        }
-    }
-    
-    fn get_option_ip(&self, optionid: u32) -> Result<Ipv4Addr, u32> {
-        let mut optionvalue: *mut DHCP_OPTION_VALUE = ptr::null_mut();
-
-        let mut scopeinfo = DHCP_OPTION_SCOPE_INFO {
-            ScopeType: DhcpSubnetOptions,
-            ScopeInfo: DHCP_OPTION_SCOPE_INFO_0 { SubnetScopeInfo: self.subnetaddress },
-        };
-
-        match unsafe { DhcpGetOptionValueV5(&self.serveripaddress,
-            0x00,
-            optionid,
-            PCWSTR::null(),
-            PCWSTR::null(),
-            &mut scopeinfo,
-            &mut optionvalue) } {
-                0 => (),
-                n => { return Err(n); },
-        }
-
-        let option = unsafe{ (*((*optionvalue).Value.Elements)).Element.IpAddressOption };
-
-        unsafe { DhcpRpcFreeMemory((*optionvalue).Value.Elements as *mut c_void) };
-        unsafe { DhcpRpcFreeMemory(optionvalue as *mut c_void) };
-
-        Ok(Ipv4Addr::from(option))
-    }
-    
-    fn get_option_ips(&self, optionid: u32) -> Result<Vec<Ipv4Addr>, u32> {
-        let mut optionvalue: *mut DHCP_OPTION_VALUE = ptr::null_mut();
-
-        let mut scopeinfo = DHCP_OPTION_SCOPE_INFO {
-            ScopeType: DhcpSubnetOptions,
-            ScopeInfo: DHCP_OPTION_SCOPE_INFO_0 { SubnetScopeInfo: self.subnetaddress },
-        };
-
-        match unsafe { DhcpGetOptionValueV5(&self.serveripaddress,
-            0x00,
-            optionid,
-            PCWSTR::null(),
-            PCWSTR::null(),
-            &mut scopeinfo,
-            &mut optionvalue) } {
-                0 => (),
-                2 => return Ok(Vec::new()),
-                e => return Err(e),
-        }
-
-        let len = unsafe{ (*optionvalue).Value.NumElements };
-
-        let mut ips = Vec::with_capacity(len as usize);
-
-        for idx in 0..len {
-            let element = unsafe{ (*optionvalue).Value.Elements.offset(idx.try_into().unwrap()) };
-            let value = unsafe{ (*element).Element.IpAddressOption };
-            ips.push(Ipv4Addr::from(value));
-            unsafe { DhcpRpcFreeMemory(element as *mut c_void) };
-        }
-
-        unsafe { DhcpRpcFreeMemory(optionvalue as *mut c_void) };
-
-        Ok(ips)
-    }
-
-    fn set_option_ip(&self, optionid: u32, value: Ipv4Addr) -> Result<(), u32> {
-        let mut scopeinfo = DHCP_OPTION_SCOPE_INFO {
-            ScopeType: DhcpSubnetOptions,
-            ScopeInfo: DHCP_OPTION_SCOPE_INFO_0 { SubnetScopeInfo: self.subnetaddress },
-        };
-
-        let mut value = DHCP_OPTION_DATA_ELEMENT {
-            OptionType: DhcpIpAddressOption,
-            Element: DHCP_OPTION_DATA_ELEMENT_0 {
-                IpAddressOption: u32::from(value)
-            },
-        };
-
-        let mut optionvalue = DHCP_OPTION_DATA {
-            NumElements: 1,
-            Elements: &mut value
-        };
-
-        match unsafe { DhcpSetOptionValueV5(&self.serveripaddress,
-            0x00,
-            optionid,
-            PCWSTR::null(),
-            PCWSTR::null(),
-            &mut scopeinfo,
-            &mut optionvalue,
-        ) } {
-            0 => Ok(()),
-            n => Err(n),
-        }
-    }
-
-    fn set_option_ips(&self, optionid: u32, values: &Vec<Ipv4Addr>) -> Result<(), u32> {
-        if values.is_empty() {
-            return self.remove_option(optionid);
-        }
-
-        let mut scopeinfo = DHCP_OPTION_SCOPE_INFO {
-            ScopeType: DhcpSubnetOptions,
-            ScopeInfo: DHCP_OPTION_SCOPE_INFO_0 { SubnetScopeInfo: self.subnetaddress },
-        };
-
-        let mut values = values.iter().map( |i|
-            DHCP_OPTION_DATA_ELEMENT {
-                OptionType: DhcpIpAddressOption,
-                Element: DHCP_OPTION_DATA_ELEMENT_0 {
-                    IpAddressOption: u32::from(i.to_owned())
-                },
-            }
-        ).collect::<Vec<DHCP_OPTION_DATA_ELEMENT>>();
-
-        let mut optionvalue = DHCP_OPTION_DATA {
-            NumElements: values.len() as u32,
-            Elements: values.as_mut_ptr(),
-        };
-
-        match unsafe { DhcpSetOptionValueV5(&self.serveripaddress,
-            0x00,
-            optionid,
-            PCWSTR::null(),
-            PCWSTR::null(),
-            &mut scopeinfo,
-            &mut optionvalue,
-        ) } {
-            0 => Ok(()),
-            n => Err(n),
-        }
-    }
-*/
     fn remove_option(&self, optionid: u32) -> Result<(), u32> {
         let mut scopeinfo = DHCP_OPTION_SCOPE_INFO {
             ScopeType: DhcpSubnetOptions,
@@ -364,6 +184,7 @@ impl Subnet {
             n => Err(n),
         };
 
+        #[cfg(not(feature = "no_rpc_free"))]
         unsafe { DhcpRpcFreeMemory(subnetinfo as *mut c_void) };
 
         ret
@@ -472,18 +293,20 @@ impl Subnet {
         unsafe {
             (*data.Element.IpRange).StartAddress = std::cmp::min((*data.Element.IpRange).StartAddress, start_address);
             (*data.Element.IpRange).EndAddress = std::cmp::max((*data.Element.IpRange).EndAddress, end_address);
+            debug!("Set range to {:?}", &data.Element.IpRange);
         }
 
         self.add_element(&data)
-            .map_err(|e| WinDhcpError::new("setting subnet range2", e))?;
+            .map_err(|e| WinDhcpError::new("setting subnet range to ", e))?;
 
         unsafe {
             (*data.Element.IpRange).StartAddress = start_address;
             (*data.Element.IpRange).EndAddress = end_address;
+            debug!("Set range to {:?}", &data.Element.IpRange);
         }
 
         self.add_element(&data)
-            .map_err(|e| WinDhcpError::new("setting subnet range3", e))?;
+            .map_err(|e| WinDhcpError::new("setting subnet range2", e))?;
 
         //unsafe { DhcpRpcFreeMemory(data as *mut c_void) };
 
@@ -547,6 +370,7 @@ impl Subnet {
                 Vec::from_raw_parts((*reservation.ReservedForClient).Data, vec_len, vec_len)[5..].to_vec().clone()
             });
         }
+        #[cfg(not(feature = "no_rpc_free"))]
         unsafe { DhcpRpcFreeMemory(reservations.Elements as *mut c_void); };
 
         Ok(ret)
@@ -651,6 +475,8 @@ impl Subnet {
 
             ret.insert(Ipv4Addr::from(client.ClientIpAddress), client.AddressState);
         }
+
+        #[cfg(not(feature = "no_rpc_free"))]
         unsafe { DhcpRpcFreeMemory((*clientinfo).Clients as *mut c_void); };
 
         Ok(ret)

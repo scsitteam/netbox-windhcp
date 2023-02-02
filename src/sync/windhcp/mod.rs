@@ -1,5 +1,6 @@
 use log::debug;
 use std::net::Ipv4Addr;
+#[cfg(not(feature = "no_rpc_free"))]
 use std::os::raw::c_void;
 use std::ptr;
 use std::sync::atomic::{AtomicUsize, Ordering};
@@ -76,8 +77,11 @@ impl WinDhcp {
             subnets.push(Ipv4Addr::from(unsafe { *data.Elements.offset(idx.try_into().unwrap()) }));
         }
 
-        unsafe { DhcpRpcFreeMemory((*enuminfo).Elements as *mut c_void) };
-        unsafe { DhcpRpcFreeMemory(enuminfo as *mut c_void) };
+        #[cfg(not(feature = "no_rpc_free"))]
+        unsafe {
+            DhcpRpcFreeMemory((*enuminfo).Elements as *mut c_void);
+            DhcpRpcFreeMemory(enuminfo as *mut c_void);
+        };
 
         Ok(subnets)
     }
@@ -127,12 +131,15 @@ impl WinDhcp {
             false => unsafe { info.ClientName.to_string() }.unwrap_or_default(),
         };
 
-        unsafe { DhcpRpcFreeMemory((*clientinfo).ClientName.as_ptr() as *mut c_void) };
-        unsafe { DhcpRpcFreeMemory((*clientinfo).ClientComment.as_ptr() as *mut c_void) };
-        unsafe { DhcpRpcFreeMemory((*clientinfo).ClientHardwareAddress.Data as *mut c_void) };
-        unsafe { DhcpRpcFreeMemory((*clientinfo).OwnerHost.HostName.as_ptr() as *mut c_void) };
-        unsafe { DhcpRpcFreeMemory((*clientinfo).OwnerHost.NetBiosName.as_ptr() as *mut c_void) };
-        unsafe { DhcpRpcFreeMemory(clientinfo as *mut c_void) };
+        #[cfg(not(feature = "no_rpc_free"))]
+        unsafe {
+            DhcpRpcFreeMemory((*clientinfo).ClientName.as_ptr() as *mut c_void);
+            DhcpRpcFreeMemory((*clientinfo).ClientComment.as_ptr() as *mut c_void);
+            DhcpRpcFreeMemory((*clientinfo).ClientHardwareAddress.Data as *mut c_void);
+            DhcpRpcFreeMemory((*clientinfo).OwnerHost.HostName.as_ptr() as *mut c_void);
+            DhcpRpcFreeMemory((*clientinfo).OwnerHost.NetBiosName.as_ptr() as *mut c_void);
+            DhcpRpcFreeMemory(clientinfo as *mut c_void);
+        };
 
         Ok(name)
     }
@@ -159,12 +166,15 @@ impl WinDhcp {
             e => Err(WinDhcpError::new("setting client name", e)),
         };
 
-        unsafe { DhcpRpcFreeMemory((*clientinfo).ClientName.as_ptr() as *mut c_void) };
-        unsafe { DhcpRpcFreeMemory((*clientinfo).ClientComment.as_ptr() as *mut c_void) };
-        unsafe { DhcpRpcFreeMemory((*clientinfo).ClientHardwareAddress.Data as *mut c_void) };
-        unsafe { DhcpRpcFreeMemory((*clientinfo).OwnerHost.HostName.as_ptr() as *mut c_void) };
-        unsafe { DhcpRpcFreeMemory((*clientinfo).OwnerHost.NetBiosName.as_ptr() as *mut c_void) };
-        unsafe { DhcpRpcFreeMemory(clientinfo as *mut c_void) };
+        #[cfg(not(feature = "no_rpc_free"))]
+        unsafe {
+            DhcpRpcFreeMemory((*clientinfo).ClientName.as_ptr() as *mut c_void);
+            DhcpRpcFreeMemory((*clientinfo).ClientComment.as_ptr() as *mut c_void);
+            DhcpRpcFreeMemory((*clientinfo).ClientHardwareAddress.Data as *mut c_void);
+            DhcpRpcFreeMemory((*clientinfo).OwnerHost.HostName.as_ptr() as *mut c_void);
+            DhcpRpcFreeMemory((*clientinfo).OwnerHost.NetBiosName.as_ptr() as *mut c_void);
+            DhcpRpcFreeMemory(clientinfo as *mut c_void);
+        };
 
         ret
     }
@@ -190,12 +200,15 @@ impl WinDhcp {
             false => unsafe { info.ClientComment.to_string() }.unwrap_or_default(),
         };
 
-        unsafe { DhcpRpcFreeMemory((*clientinfo).ClientName.as_ptr() as *mut c_void) };
-        unsafe { DhcpRpcFreeMemory((*clientinfo).ClientComment.as_ptr() as *mut c_void) };
-        unsafe { DhcpRpcFreeMemory((*clientinfo).ClientHardwareAddress.Data as *mut c_void) };
-        unsafe { DhcpRpcFreeMemory((*clientinfo).OwnerHost.HostName.as_ptr() as *mut c_void) };
-        unsafe { DhcpRpcFreeMemory((*clientinfo).OwnerHost.NetBiosName.as_ptr() as *mut c_void) };
-        unsafe { DhcpRpcFreeMemory(clientinfo as *mut c_void) };
+        #[cfg(not(feature = "no_rpc_free"))]
+        unsafe {
+            DhcpRpcFreeMemory((*clientinfo).ClientName.as_ptr() as *mut c_void);
+            DhcpRpcFreeMemory((*clientinfo).ClientComment.as_ptr() as *mut c_void);
+            DhcpRpcFreeMemory((*clientinfo).ClientHardwareAddress.Data as *mut c_void);
+            DhcpRpcFreeMemory((*clientinfo).OwnerHost.HostName.as_ptr() as *mut c_void);
+            DhcpRpcFreeMemory((*clientinfo).OwnerHost.NetBiosName.as_ptr() as *mut c_void);
+            DhcpRpcFreeMemory(clientinfo as *mut c_void);
+        };
 
         Ok(name)
     }
@@ -222,12 +235,15 @@ impl WinDhcp {
             e => Err(WinDhcpError::new("setting client name", e)),
         };
 
-        unsafe { DhcpRpcFreeMemory((*clientinfo).ClientName.as_ptr() as *mut c_void) };
-        unsafe { DhcpRpcFreeMemory((*clientinfo).ClientComment.as_ptr() as *mut c_void) };
-        unsafe { DhcpRpcFreeMemory((*clientinfo).ClientHardwareAddress.Data as *mut c_void) };
-        unsafe { DhcpRpcFreeMemory((*clientinfo).OwnerHost.HostName.as_ptr() as *mut c_void) };
-        unsafe { DhcpRpcFreeMemory((*clientinfo).OwnerHost.NetBiosName.as_ptr() as *mut c_void) };
-        unsafe { DhcpRpcFreeMemory(clientinfo as *mut c_void) };
+        #[cfg(not(feature = "no_rpc_free"))]
+        unsafe {
+            DhcpRpcFreeMemory((*clientinfo).ClientName.as_ptr() as *mut c_void);
+            DhcpRpcFreeMemory((*clientinfo).ClientComment.as_ptr() as *mut c_void);
+            DhcpRpcFreeMemory((*clientinfo).ClientHardwareAddress.Data as *mut c_void);
+            DhcpRpcFreeMemory((*clientinfo).OwnerHost.HostName.as_ptr() as *mut c_void);
+            DhcpRpcFreeMemory((*clientinfo).OwnerHost.NetBiosName.as_ptr() as *mut c_void);
+            DhcpRpcFreeMemory(clientinfo as *mut c_void);
+        };
 
         ret
     }
