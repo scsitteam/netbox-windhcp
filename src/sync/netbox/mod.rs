@@ -8,6 +8,7 @@ use ipnet::Ipv4Net;
 use log::{debug, warn};
 use serde::Deserialize;
 use serde_json::json;
+use ureq::{Request, MiddlewareNext, Response, Error};
 
 pub mod config;
 use self::config::SyncNetboxConfig;
@@ -21,28 +22,26 @@ use address::*;
 
 pub struct NetboxApi {
     config: SyncNetboxConfig,
-    client: reqwest::Client,
+    client: ureq::Agent,
 }
 
 impl NetboxApi {
     pub fn new(config: &SyncNetboxConfig) -> Self {
         let config = config.clone();
 
-        let mut headers = reqwest::header::HeaderMap::new();
-        let mut auth_value = reqwest::header::HeaderValue::from_str(format!("Token {}", config.token()).as_str()).unwrap();
-        auth_value.set_sensitive(true);
-        headers.insert(reqwest::header::AUTHORIZATION, auth_value);
+        let auth_value = format!("Token {}", config.token());
 
-        let client = reqwest::Client::builder()
-            .danger_accept_invalid_certs(true)
-            .default_headers(headers)
-            .build()
-            .unwrap();
+        let client = ureq::AgentBuilder::new()
+            .user_agent(concat!(env!("CARGO_PKG_NAME"), "/", env!("CARGO_PKG_VERSION")))
+            .middleware(move |req: Request, next: MiddlewareNext| -> Result<Response, Error> {
+                next.handle(req.set("Authorization", auth_value.as_str()))
+            })
+            .build();
 
         Self { config, client }
     }
 
-    pub async fn version(
+    pub fn version(
         &self,
     ) -> Result<String, Box<dyn std::error::Error + Send + std::marker::Sync>> {
         let url = format!("{}status/", self.config.apiurl());
@@ -53,37 +52,36 @@ impl NetboxApi {
             netbox_version: String,
         }
 
-        let status: NetboxStatus = self.client.get(url)
-            .send().await?
-            .error_for_status()?
-            .json().await?;
+        let status: NetboxStatus = self.client.get(&url)
+            .call()?
+            .into_json()?;
 
         Ok(status.netbox_version)
     }
 
-    pub async fn get_prefixes(&self) -> reqwest::Result<Vec<Prefix>> {
-        self.get_objects("ipam/prefixes/", self.config.prefix_filter()).await
+    pub fn get_prefixes(&self) -> Result<Vec<Prefix>, ureq::Error> {
+        self.get_objects("ipam/prefixes/", self.config.prefix_filter())
     }
 
-    pub async fn get_ranges(&self) -> reqwest::Result<Vec<IpRange>> {
-        self.get_objects("ipam/ip-ranges/", self.config.range_filter()).await
+    pub fn get_ranges(&self) -> Result<Vec<IpRange>, ureq::Error> {
+        self.get_objects("ipam/ip-ranges/", self.config.range_filter())
     }
 
-    pub async fn get_reservations_for_subnet(&self, subnet: &Ipv4Net) -> reqwest::Result<Vec<IpAddress>> {
-        self.get_objects("ipam/ip-addresses/", &self.config.reservation_filter(subnet)).await
+    pub fn get_reservations_for_subnet(&self, subnet: &Ipv4Net) -> Result<Vec<IpAddress>, ureq::Error> {
+        self.get_objects("ipam/ip-addresses/", &self.config.reservation_filter(subnet))
     }
 
-    pub async fn get_router_for_subnet(&self, subnet: &Ipv4Net) -> reqwest::Result<Vec<IpAddress>> {
-        self.get_objects("ipam/ip-addresses/", &self.config.router_filter(subnet)).await
+    pub fn get_router_for_subnet(&self, subnet: &Ipv4Net) -> Result<Vec<IpAddress>, ureq::Error> {
+        self.get_objects("ipam/ip-addresses/", &self.config.router_filter(subnet))
     }
 
-    pub async fn set_ip_last_active(&self, ip: Ipv4Addr, subnet: Ipv4Net) -> reqwest::Result<()> {
+    pub fn set_ip_last_active(&self, ip: Ipv4Addr, subnet: Ipv4Net) -> Result<(), ureq::Error> {
         let filter: HashMap<String, String> = HashMap::from([
             (String::from("address"), ip.to_string()),
             (String::from("mask_length"), subnet.prefix_len().to_string())
         ]);
 
-        let ips: Vec<IpAddress> = self.get_objects("ipam/ip-addresses/", &filter).await?;
+        let ips: Vec<IpAddress> = self.get_objects("ipam/ip-addresses/", &filter)?;
 
         if ips.len() != 1 {
             warn!("Not exactly one IPAddress foudn for ip {}", ip);
@@ -102,27 +100,29 @@ impl NetboxApi {
         });
 
         self.client.patch(ips[0].url())
-            .body(payload.to_string())
-            .header("Content-Type", "application/json")
-            .send().await?
-            .error_for_status()?;
+            .set("Content-Type", "application/json")
+            .send_string(payload.to_string().as_str())?;
 
         Ok(())
     }
 
-    async fn get_objects<T: for<'a> Deserialize<'a>>(
+    fn get_objects<T: for<'a> Deserialize<'a>>(
         &self,
         path: &str,
         filter: &HashMap<String, String>,
-    ) -> reqwest::Result<Vec<T>> {
+    ) -> Result<Vec<T>, ureq::Error> {
         let url = format!("{}{}", self.config.apiurl(), path);
 
+        let mut query: Vec<(&str, &str)> = vec![];
+        for (key, val) in filter.iter() {
+            query.push((key.as_str(), val.as_str()));
+        }
+
         debug!("Fetch {} from {:?}", std::any::type_name::<T>(), url);
-        let mut page: Pageination<T> = self.client.get(url)
-            .query(filter)
-            .send().await?
-            .error_for_status()?
-            .json().await?;
+        let mut page: Pageination<T> = self.client.get(&url)
+            .query_pairs(query)
+            .call()?
+            .into_json()?;
 
         let mut objects: Vec<T> = Vec::with_capacity(page.count);
 
@@ -133,9 +133,8 @@ impl NetboxApi {
                 Some(ref u) => {
                     debug!("Fetch next page from {:?}", u);
                     page = self.client.get(u)
-                        .send().await?
-                        .error_for_status()?
-                        .json().await?;
+                        .call()?
+                        .into_json()?;
                 }
                 None => { break; }
             }
@@ -144,13 +143,11 @@ impl NetboxApi {
         Ok(objects)
     }
 
-    pub async fn get_object<T: for<'a> Deserialize<'a>>(&self, url: &str) -> reqwest::Result<T> {
+    pub fn get_object<T: for<'a> Deserialize<'a>>(&self, url: &str) -> Result<T, ureq::Error> {
         debug!("Fetch {} from {:?}", std::any::type_name::<T>(), url);
         let object: T = self.client.get(url)
-            .send().await?
-            .error_for_status()?
-            .json().await?;
-
+            .call()?
+            .into_json()?;
         Ok(object)
     }
 }

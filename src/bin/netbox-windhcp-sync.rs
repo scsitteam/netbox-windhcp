@@ -3,8 +3,7 @@ use netbox_windhcp::Config;
 #[cfg(target_os = "windows")]
 use netbox_windhcp::{cli, Sync};
 
-#[tokio::main]
-async fn main() {
+fn main() {
     let config = match Config::load_from_file() {
         Ok(config) => config,
         Err(e) => {
@@ -19,7 +18,7 @@ async fn main() {
     let cli_args = cli::Sync::init();
 
     #[cfg(target_os = "windows")]
-    match Sync::new(config.sync, cli_args.noop).run().await {
+    match Sync::new(config.sync, cli_args.noop).run() {
         Ok(_) => std::process::exit(exitcode::OK),
         Err(e) => {
             error!("{}", e);
