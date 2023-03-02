@@ -29,16 +29,16 @@ impl Sync {
         Self { config, netbox, dhcp, noop }
     }
 
-    pub async fn run(&self) -> Result<(), Box<dyn std::error::Error + Send + std::marker::Sync>> {
+    pub fn run(&self) -> Result<(), Box<dyn std::error::Error + Send + std::marker::Sync>> {
         info!("Start sync from {} to {}", self.config.netbox.apiurl(), self.config.dhcp.server());
 
-        let netbox_version = self.netbox.version().await?;
+        let netbox_version = self.netbox.version()?;
         debug!("Netbox Version: {}", netbox_version);
         let dhcp_version = self.dhcp.get_version()?;
         debug!("Windows DHCp Server Version: {}.{}", dhcp_version.0, dhcp_version.1);
 
-        let prefixes = self.netbox.get_prefixes().await?;
-        let ranges = self.netbox.get_ranges().await?;
+        let prefixes = self.netbox.get_prefixes()?;
+        let ranges = self.netbox.get_ranges()?;
         info!("Found {} Prefixes and {} Ranges", prefixes.len(), ranges.len());
 
         for prefix in prefixes.iter() {
@@ -51,15 +51,15 @@ impl Sync {
                     continue;
                 }
             };
-            let subnet = self.sync_subnetv4(prefix, range).await?;
+            let subnet = self.sync_subnetv4(prefix, range)?;
 
             /* Update Reservations */
             let mut dhcp_reservations = subnet.get_reservations().unwrap();
-            let reservations = self.netbox.get_reservations_for_subnet(&prefix.prefix()).await?;
+            let reservations = self.netbox.get_reservations_for_subnet(&prefix.prefix())?;
             info!("  Subnet {}: Found {} reservations", &prefix.addr(), reservations.len());
 
             for reservation in reservations.iter() {
-                self.sync_reservationv4(&subnet, reservation,  dhcp_reservations.remove(&reservation.address())).await?;
+                self.sync_reservationv4(&subnet, reservation,  dhcp_reservations.remove(&reservation.address()))?;
             }
 
             /* Cleanup old Reservations */
@@ -72,7 +72,7 @@ impl Sync {
             if self.config.netbox.last_used() {
                 for (ip, state) in subnet.get_clients_state()? {
                     if (state & 0xF0) == 0x00 { continue; }
-                    match self.netbox.set_ip_last_active(ip, prefix.prefix()).await {
+                    match self.netbox.set_ip_last_active(ip, prefix.prefix()) {
                         Ok(_) => {},
                         Err(_) => error!("  Reservation {}: Updating last used.", ip),
                     }
@@ -94,7 +94,7 @@ impl Sync {
         Ok(())
     }
 
-    async fn sync_subnetv4(
+    fn sync_subnetv4(
         &self,
         prefix: &Prefix,
         range: &IpRange,
@@ -148,7 +148,7 @@ impl Sync {
         let routers = match prefix.routers() {
             Some(ip) => ip,
             None => {
-                let routers = self.netbox.get_router_for_subnet(&prefix.prefix()).await?;
+                let routers = self.netbox.get_router_for_subnet(&prefix.prefix())?;
                 routers.iter().map(|i| i.address()).collect()
             }
         };
@@ -176,13 +176,13 @@ impl Sync {
         Ok(subnet)
     }
 
-    async fn sync_reservationv4(
+    fn sync_reservationv4(
         &self,
         subnet: &Subnet,
         reservation: &IpAddress,
         dhcp_mac: Option<Vec<u8>>,
     ) -> Result<(), Box<dyn std::error::Error + Send + std::marker::Sync>> {
-        let mac = match self.get_macaddress_for_reservation(reservation).await? {
+        let mac = match self.get_macaddress_for_reservation(reservation)? {
             Some(mac) => mac,
             None => {
                 warn!("Error no MAC address found for IP {}", &reservation.address());
@@ -221,14 +221,14 @@ impl Sync {
         Ok(())
     }
 
-    async fn get_macaddress_for_reservation(
+    fn get_macaddress_for_reservation(
         &self,
         reservation: &IpAddress,
     ) -> Result<Option<Vec<u8>>, Box<dyn std::error::Error + Send + std::marker::Sync>> {
         let mac = match reservation.reservation_mac() {
             Some(mac) => Some(mac.clone()),
             None => match reservation.assigned_object_url() {
-                Some(url) => self.get_macaddress_for_reservation_from_assigned_object(url).await?,
+                Some(url) => self.get_macaddress_for_reservation_from_assigned_object(url)?,
                 None => None,
             },
         };
@@ -236,7 +236,7 @@ impl Sync {
         Ok(mac.map(|m| Vec::<u8>::from_mac(&m)))
     }
 
-    async fn get_macaddress_for_reservation_from_assigned_object(&self, url: &str) -> Result<Option<String>, Box<dyn std::error::Error + Send + std::marker::Sync>> {
-        Ok(self.netbox.get_object::<AssignedObject>(url).await?.mac_address().cloned())
+    fn get_macaddress_for_reservation_from_assigned_object(&self, url: &str) -> Result<Option<String>, Box<dyn std::error::Error + Send + std::marker::Sync>> {
+        Ok(self.netbox.get_object::<AssignedObject>(url)?.mac_address().cloned())
     }
 }
