@@ -1,10 +1,9 @@
 [package]
 name = "netbox-windhcp"
-version = "0.9.2"
+version = "0.9.3"
 edition = "2021"
 
 [features]
-# Defines a feature named `webp` that does not enable any other features.
 rpc_free = []
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
