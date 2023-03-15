@@ -1,4 +1,4 @@
-use log::debug;
+use log::{debug, info};
 use serde::Deserialize;
 use std::{collections::HashMap, fmt, net::Ipv4Addr, ptr};
 #[cfg(feature = "rpc_free")]
@@ -293,7 +293,7 @@ impl Subnet {
         unsafe {
             (*data.Element.IpRange).StartAddress = std::cmp::min((*data.Element.IpRange).StartAddress, start_address);
             (*data.Element.IpRange).EndAddress = std::cmp::max((*data.Element.IpRange).EndAddress, end_address);
-            debug!("Set range to {:?}", &data.Element.IpRange);
+            info!("Set range to {} - {}", Ipv4Addr::from((*data.Element.IpRange).StartAddress), Ipv4Addr::from((*data.Element.IpRange).EndAddress));
         }
 
         self.add_element(&data)
@@ -302,7 +302,7 @@ impl Subnet {
         unsafe {
             (*data.Element.IpRange).StartAddress = start_address;
             (*data.Element.IpRange).EndAddress = end_address;
-            debug!("Set range to {:?}", &data.Element.IpRange);
+            info!("Set range to {} - {}", Ipv4Addr::from((*data.Element.IpRange).StartAddress), Ipv4Addr::from((*data.Element.IpRange).EndAddress));
         }
 
         self.add_element(&data)
@@ -410,7 +410,7 @@ impl Subnet {
             .collect();
 
         let mut reserved_for_client = DHCP_BINARY_DATA {
-            DataLength: (macaddress.len() + 5) as u32,
+            DataLength: macaddress.len() as u32,
             Data: data.as_mut_ptr(),
         };
         let mut reserved_ip = DHCP_IP_RESERVATION_V4 {
