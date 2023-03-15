@@ -1,4 +1,4 @@
-use log::{debug, info};
+use log::info;
 use serde::Deserialize;
 use std::{collections::HashMap, fmt, net::Ipv4Addr, ptr};
 #[cfg(feature = "rpc_free")]
