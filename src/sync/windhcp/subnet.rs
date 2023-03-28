@@ -1,3 +1,4 @@
+use ipnet::Ipv4Net;
 use log::info;
 use serde::Deserialize;
 use std::{collections::HashMap, fmt, net::Ipv4Addr, ptr};
@@ -291,8 +292,15 @@ impl Subnet {
         };
 
         unsafe {
-            (*data.Element.IpRange).StartAddress = std::cmp::min((*data.Element.IpRange).StartAddress, start_address);
-            (*data.Element.IpRange).EndAddress = std::cmp::max((*data.Element.IpRange).EndAddress, end_address);
+            (*data.Element.IpRange).StartAddress = std::cmp::max(
+                std::cmp::min((*data.Element.IpRange).StartAddress, start_address),
+                self.get_range_min()
+            );
+
+            (*data.Element.IpRange).EndAddress = std::cmp::min(
+                std::cmp::max((*data.Element.IpRange).EndAddress, end_address),
+                self.get_range_max()
+            );
             info!("Set range to {} - {}", Ipv4Addr::from((*data.Element.IpRange).StartAddress), Ipv4Addr::from((*data.Element.IpRange).EndAddress));
         }
 
@@ -480,6 +488,15 @@ impl Subnet {
         unsafe { DhcpRpcFreeMemory((*clientinfo).Clients as *mut c_void); };
 
         Ok(ret)
+    }
+
+    fn get_range_min(&self) -> u32 {
+        self.subnetaddress + 1
+    } 
+
+    fn get_range_max(&self) -> u32 {
+        let net = Ipv4Net::with_netmask(Ipv4Addr::from(self.subnetaddress), self.subnet_mask).expect("Unable to create net");
+        net.broadcast().into()
     }
 }
 
