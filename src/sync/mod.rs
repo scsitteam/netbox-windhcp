@@ -30,7 +30,7 @@ impl Sync {
     }
 
     pub fn run(&self) -> Result<(), Box<dyn std::error::Error + Send + std::marker::Sync>> {
-        info!("Start sync from {} to {} ({} v{})", self.config.netbox.apiurl(), self.config.dhcp.server(), env!("CARGO_PKG_NAME"), env!("CARGO_PKG_VERSION"));
+        info!("Start sync from {} to {} ({} {})", self.config.netbox.apiurl(), self.config.dhcp.server(), env!("CARGO_PKG_NAME"), git_version::git_version!(prefix = "git:", cargo_prefix = "cargo:", fallback = "unknown"));
 
         let netbox_version = self.netbox.version()?;
         debug!("Netbox Version: {}", netbox_version);
