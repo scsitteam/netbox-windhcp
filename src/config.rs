@@ -19,9 +19,6 @@ pub struct Config {
 }
 
 impl Config {
-    #[cfg(debug_assertions)]
-    const CONFIG_FILE: &str = concat!("./", env!("CARGO_PKG_NAME"), ".cfg");
-    #[cfg(not(debug_assertions))]
     const CONFIG_FILE: &str = concat!(
         "C:\\ProgramData\\",
         env!("CARGO_PKG_NAME"),
@@ -29,9 +26,10 @@ impl Config {
         env!("CARGO_PKG_NAME"),
         ".cfg"
     );
+    const CONFIG_FILE_LOCAL: &str = concat!("./", env!("CARGO_PKG_NAME"), ".cfg");
 
     pub fn load_from_file() -> Result<Self, Box<dyn Error>> {
-        let file = File::open(Self::CONFIG_FILE)?;
+        let file = File::open(Self::CONFIG_FILE).unwrap_or(File::open(Self::CONFIG_FILE_LOCAL)?);
 
         Ok(serde_yaml::from_reader::<File, Config>(file)?)
     }

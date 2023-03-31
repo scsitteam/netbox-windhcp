@@ -15,12 +15,16 @@ jobs:
 
     steps:
     - uses: actions/checkout@v3
+      with:
+        fetch-depth: 0
+    - name: Rust Cache
+      uses: Swatinem/rust-cache@v2
     - name: Build
-      run: cargo build --release --verbose
+      run: cargo build --verbose
     - name: Install Cargo Wix
       run: cargo install --verbose cargo-wix
     - name: Build MSI
-      run: cargo wix --verbose
+      run: cargo wix --verbose --dbg-build
 
     - name: Create Release
       uses: softprops/action-gh-release@v1

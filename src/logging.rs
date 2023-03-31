@@ -1,4 +1,4 @@
-use std::path::PathBuf;
+use std::path::{PathBuf, Path};
 
 use log::LevelFilter;
 use log4rs::{
@@ -23,10 +23,11 @@ pub struct LogConfig {
 
 impl Default for LogConfig {
     fn default() -> Self {
-        #[cfg(debug_assertions)]
-        let dir = None;
-        #[cfg(not(debug_assertions))]
-        let dir = Some(PathBuf::from(concat!("C:\\ProgramData\\", env!("CARGO_PKG_NAME"))));
+        let dir = if Path::new(concat!("C:\\ProgramData\\", env!("CARGO_PKG_NAME"))).exists() {
+            Some(PathBuf::from(concat!("C:\\ProgramData\\", env!("CARGO_PKG_NAME"))))
+        } else {
+            None
+        };
 
         Self { dir, level: LevelFilter::Info, max_size: 10*1024*1024, keep_logs: 10 }
     }
