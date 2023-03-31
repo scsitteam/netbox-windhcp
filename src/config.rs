@@ -29,7 +29,7 @@ impl Config {
     const CONFIG_FILE_LOCAL: &str = concat!("./", env!("CARGO_PKG_NAME"), ".cfg");
 
     pub fn load_from_file() -> Result<Self, Box<dyn Error>> {
-        let file = File::open(Self::CONFIG_FILE).unwrap_or(File::open(Self::CONFIG_FILE_LOCAL)?);
+        let file = File::open(Self::CONFIG_FILE).or(File::open(Self::CONFIG_FILE_LOCAL))?;
 
         Ok(serde_yaml::from_reader::<File, Config>(file)?)
     }
