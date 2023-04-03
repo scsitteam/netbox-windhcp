@@ -19,14 +19,15 @@ pub struct Sync {
     netbox: NetboxApi,
     dhcp: WinDhcp,
     noop: bool,
+    scope: Option<Ipv4Addr>,
 }
 
 impl Sync {
-    pub fn new(config: SyncConfig, noop: bool) -> Self {
+    pub fn new(config: SyncConfig, noop: bool, scope: Option<Ipv4Addr>) -> Self {
         let netbox = NetboxApi::new(&config.netbox);
         let dhcp = WinDhcp::new(config.dhcp.server());
 
-        Self { config, netbox, dhcp, noop }
+        Self { config, netbox, dhcp, noop, scope}
     }
 
     pub fn run(&self) -> Result<(), Box<dyn std::error::Error + Send + std::marker::Sync>> {
@@ -42,6 +43,13 @@ impl Sync {
         info!("Found {} Prefixes and {} Ranges", prefixes.len(), ranges.len());
 
         for prefix in prefixes.iter() {
+            if let Some(scope) = self.scope {
+                if !prefix.prefix().contains(&scope) {
+                    debug!("Skip Prefix {} - {}", prefix.prefix(), prefix.description());
+                    continue;
+                }
+            }
+
             info!("Sync Prefix {} - {}", prefix.prefix(), prefix.description());
 
             let range = match ranges.iter().find(|&r| r.is_contained(prefix)) {

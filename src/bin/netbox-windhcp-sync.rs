@@ -18,7 +18,7 @@ fn main() {
     let cli_args = cli::Sync::init();
 
     #[cfg(target_os = "windows")]
-    match Sync::new(config.sync, cli_args.noop).run() {
+    match Sync::new(config.sync, cli_args.noop, cli_args.scope).run() {
         Ok(_) => std::process::exit(exitcode::OK),
         Err(e) => {
             error!("{}", e);
