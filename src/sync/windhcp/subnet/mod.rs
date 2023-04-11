@@ -2,7 +2,6 @@ use ipnet::Ipv4Net;
 use log::{info, trace};
 use serde::Deserialize;
 use std::{collections::HashMap, fmt, net::Ipv4Addr, ptr};
-#[cfg(feature = "rpc_free")]
 use std::ffi::c_void;
 use windows::{
     core::{HSTRING, PCWSTR, PWSTR},
@@ -527,22 +526,8 @@ impl SubnetElements<DHCP_BOOTP_IP_RANGE> for Subnet {
             0 => unsafe {
                 let range = DHCP_BOOTP_IP_RANGE { ..(*(*(*enumelementinfo).Elements).Element.IpRange) };
 
-                #[cfg(feature = "rpc_free")]
-                if unsafe { (*enumelementinfo).NumElements } > 1 {
-                    for idx in 1..unsafe { (*enumelementinfo).NumElements } {
-                        let ptr = unsafe { (*enumelementinfo).Elements.offset(idx.try_into().unwrap()) };
-                        
-                        unsafe {
-                            DhcpRpcFreeMemory(ptr as *mut c_void);
-                        };
-                    }
-                }
-                
-                #[cfg(feature = "rpc_free")]
-                unsafe {
-                    DhcpRpcFreeMemory((*enumelementinfo).Elements as *mut c_void); 
-                    DhcpRpcFreeMemory(enumelementinfo as *mut c_void);
-                };
+                DhcpRpcFreeMemory((*enumelementinfo).Elements as *mut c_void); 
+                DhcpRpcFreeMemory(enumelementinfo as *mut c_void);
 
                 Ok(Some(range))
             },
