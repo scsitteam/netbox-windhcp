@@ -80,63 +80,6 @@ impl Subnet {
         Ok(Some(data))
     }
 
-    fn get_first_element(
-        &self,
-        enumelementtype: DHCP_SUBNET_ELEMENT_TYPE,
-    ) -> Result<DHCP_SUBNET_ELEMENT_DATA_V5, u32> {
-        let mut resumehandle: u32 = 0;
-        let mut elementsread: u32 = 0;
-        let mut elementstotal: u32 = 0;
-
-        let mut enumelementinfo: *mut DHCP_SUBNET_ELEMENT_INFO_ARRAY_V5 = ptr::null_mut();
-
-        match unsafe {
-            DhcpEnumSubnetElementsV5(
-                &self.serveripaddress,
-                self.subnetaddress,
-                enumelementtype,
-                &mut resumehandle,
-                0xFFFFFFFF,
-                &mut enumelementinfo,
-                &mut elementsread,
-                &mut elementstotal,
-            )
-        } {
-            0 => (),
-            n => {
-                return Err(n);
-            }
-        }
-
-        let data: DHCP_SUBNET_ELEMENT_DATA_V5 = unsafe { *(*enumelementinfo).Elements };
-
-        #[cfg(feature = "rpc_free")]
-        if unsafe { (*enumelementinfo).NumElements } > 1 {
-            for idx in 1..unsafe { (*enumelementinfo).NumElements } {
-                let ptr = unsafe { (*enumelementinfo).Elements.offset(idx.try_into().unwrap()) };
-                
-                unsafe {
-                    DhcpRpcFreeMemory(ptr as *mut c_void);
-                };
-            }
-        }
-        
-        #[cfg(feature = "rpc_free")]
-        unsafe {
-            DhcpRpcFreeMemory((*enumelementinfo).Elements as *mut c_void); 
-            DhcpRpcFreeMemory(enumelementinfo as *mut c_void);
-        };
-
-        Ok(data)
-    }
-
-    fn add_element(&self, addelementinfo: &DHCP_SUBNET_ELEMENT_DATA_V5) -> Result<(), u32> {
-        match unsafe { DhcpAddSubnetElementV5(&self.serveripaddress, self.subnetaddress, addelementinfo) } {
-            0 => Ok(()),
-            n => Err(n),
-        }
-    }
-
     fn remove_option(&self, optionid: u32) -> Result<(), u32> {
         let mut scopeinfo = DHCP_OPTION_SCOPE_INFO {
             ScopeType: DhcpSubnetOptions,
@@ -246,21 +189,11 @@ impl Subnet {
     }
 
     pub fn get_subnet_range(&self) -> WinDhcpResult<(Ipv4Addr, Ipv4Addr)> {
-        let data = match self.get_first_element(DhcpIpRangesDhcpBootp) {
-            Ok(data) => data,
-            //ERROR_NO_MORE_ITEMS
-            Err(259) => { return Ok((Ipv4Addr::from(0), Ipv4Addr::from(0))); },
-            Err(e) => return Err(WinDhcpError::new("getting subnet range", e)),
-        };
-
-        let ret = (
-            Ipv4Addr::from(unsafe { (*data.Element.IpRange).StartAddress }),
-            Ipv4Addr::from(unsafe { (*data.Element.IpRange).EndAddress }),
-        );
-
-        //unsafe { DhcpRpcFreeMemory(&mut data as *mut c_void) };
-
-        Ok(ret)
+        match SubnetElements::<DHCP_BOOTP_IP_RANGE>::get_first_element(self) {
+            Ok(Some(range)) => Ok((Ipv4Addr::from(range.StartAddress), Ipv4Addr::from(range.EndAddress))),
+            Ok(None) => Ok((Ipv4Addr::from(0), Ipv4Addr::from(0))),
+            Err(e) => Err(WinDhcpError::new("getting subnet range", e)),
+        }
     }
 
     pub fn set_subnet_range(
@@ -271,49 +204,36 @@ impl Subnet {
         let start_address = u32::from(start_address);
         let end_address = u32::from(end_address);
 
-        let mut data = match self.get_first_element(DhcpIpRangesDhcpBootp) {
-            Ok(data) => data,
-            //ERROR_NO_MORE_ITEMS
-            Err(259) => {
-                let mut ip_range = DHCP_BOOTP_IP_RANGE {
-                    StartAddress: std::u32::MAX,
-                    EndAddress: 0u32,
-                    BootpAllocated: 0u32,
-                    MaxBootpAllowed: 0u32,
-                };
-                DHCP_SUBNET_ELEMENT_DATA_V5 {
-                    ElementType: DhcpIpRangesDhcpBootp,
-                    Element: DHCP_SUBNET_ELEMENT_DATA_V5_0 {
-                        IpRange: &mut ip_range,
-                    },
-                }
+        let mut range = match SubnetElements::<DHCP_BOOTP_IP_RANGE>::get_first_element(self) {
+            Ok(Some(range)) => range,
+            Ok(None) => DHCP_BOOTP_IP_RANGE {
+                StartAddress: std::u32::MAX,
+                EndAddress: 0u32,
+                BootpAllocated: 0u32,
+                MaxBootpAllowed: 0u32,
             },
             Err(e) => return Err(WinDhcpError::new("getting subnet range", e)),
         };
 
-        unsafe {
-            (*data.Element.IpRange).StartAddress = std::cmp::max(
-                std::cmp::min((*data.Element.IpRange).StartAddress, start_address),
-                self.get_range_min()
-            );
+        range.StartAddress = std::cmp::max(
+            std::cmp::min(range.StartAddress, start_address),
+            self.get_range_min()
+        );
 
-            (*data.Element.IpRange).EndAddress = std::cmp::min(
-                std::cmp::max((*data.Element.IpRange).EndAddress, end_address),
-                self.get_range_max()
-            );
-            info!("Set range to {} - {}", Ipv4Addr::from((*data.Element.IpRange).StartAddress), Ipv4Addr::from((*data.Element.IpRange).EndAddress));
-        }
+        range.EndAddress = std::cmp::min(
+            std::cmp::max(range.EndAddress, end_address),
+            self.get_range_max()
+        );
+        info!("Set range to {} - {}", Ipv4Addr::from(range.StartAddress), Ipv4Addr::from(range.EndAddress));
 
-        self.add_element(&data)
+        self.add_element(&mut range)
             .map_err(|e| WinDhcpError::new("setting subnet range to ", e))?;
 
-        unsafe {
-            (*data.Element.IpRange).StartAddress = start_address;
-            (*data.Element.IpRange).EndAddress = end_address;
-            info!("Set range to {} - {}", Ipv4Addr::from((*data.Element.IpRange).StartAddress), Ipv4Addr::from((*data.Element.IpRange).EndAddress));
-        }
+        range.StartAddress = start_address;
+        range.EndAddress = end_address;
+        info!("Set range to {} - {}", Ipv4Addr::from(range.StartAddress), Ipv4Addr::from(range.EndAddress));
 
-        self.add_element(&data)
+        self.add_element(&mut range)
             .map_err(|e| WinDhcpError::new("setting subnet range2", e))?;
 
         //unsafe { DhcpRpcFreeMemory(data as *mut c_void) };
@@ -572,5 +492,77 @@ impl From<&DnsFlags> for u32 {
         if flags.disable_ptr_update { f += DNS_FLAG_DISABLE_PTR_UPDATE; }
 
         f
+    }
+}
+
+pub trait SubnetElements<T> {
+    fn get_first_element(&self) -> Result<Option<T>, u32>;
+    fn add_element(&self, element: &mut T) -> Result<(), u32>;
+}
+
+impl SubnetElements<DHCP_BOOTP_IP_RANGE> for Subnet {
+    fn get_first_element(&self) -> Result<Option<DHCP_BOOTP_IP_RANGE>, u32> {
+        let mut resumehandle: u32 = 0;
+        let mut elementsread: u32 = 0;
+        let mut elementstotal: u32 = 0;
+
+        let mut enumelementinfo: *mut DHCP_SUBNET_ELEMENT_INFO_ARRAY_V5 = ptr::null_mut();
+
+        match unsafe {
+            DhcpEnumSubnetElementsV5(
+                &self.serveripaddress,
+                self.subnetaddress,
+                DhcpIpRangesDhcpBootp,
+                &mut resumehandle,
+                0xFFFFFFFF,
+                &mut enumelementinfo,
+                &mut elementsread,
+                &mut elementstotal,
+            )
+        } {
+            0 => unsafe {
+                let range = DHCP_BOOTP_IP_RANGE { ..(*(*(*enumelementinfo).Elements).Element.IpRange) };
+
+                #[cfg(feature = "rpc_free")]
+                if unsafe { (*enumelementinfo).NumElements } > 1 {
+                    for idx in 1..unsafe { (*enumelementinfo).NumElements } {
+                        let ptr = unsafe { (*enumelementinfo).Elements.offset(idx.try_into().unwrap()) };
+                        
+                        unsafe {
+                            DhcpRpcFreeMemory(ptr as *mut c_void);
+                        };
+                    }
+                }
+                
+                #[cfg(feature = "rpc_free")]
+                unsafe {
+                    DhcpRpcFreeMemory((*enumelementinfo).Elements as *mut c_void); 
+                    DhcpRpcFreeMemory(enumelementinfo as *mut c_void);
+                };
+
+                Ok(Some(range))
+            },
+            //ERROR_NO_MORE_ITEMS
+            259 => {
+                Ok(None)
+            },
+            n => {
+                Err(n)
+            }
+        }
+    }
+
+    fn add_element(&self, element: &mut DHCP_BOOTP_IP_RANGE) -> Result<(), u32> {
+        let addelementinfo = DHCP_SUBNET_ELEMENT_DATA_V5  {
+            ElementType: DhcpIpRangesDhcpBootp,
+            Element: DHCP_SUBNET_ELEMENT_DATA_V5_0 {
+                IpRange: element,
+            },
+        };
+
+        match unsafe { DhcpAddSubnetElementV5(&self.serveripaddress, self.subnetaddress, &addelementinfo) } {
+            0 => Ok(()),
+            n => Err(n),
+        }
     }
 }
