@@ -135,7 +135,7 @@ impl SubnetElements<Reservation> for Subnet {
         let mut reserved_ip = DHCP_IP_RESERVATION_V4 {
             ReservedIpAddress: element.ip_address.into(),
             ReservedForClient: &mut for_client,
-            bAllowedClientTypes: element.allowed_client_types.clone().into()
+            bAllowedClientTypes: element.allowed_client_types.into()
         };
 
         let addelementinfo = DHCP_SUBNET_ELEMENT_DATA_V5  {
