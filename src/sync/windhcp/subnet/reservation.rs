@@ -5,17 +5,17 @@ use windows::Win32::NetworkManagement::Dhcp::DHCP_IP_RESERVATION_V4;
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 #[repr(u8)]
 pub enum ReservationClientTypes {
-    DHCP = 1,
-    BOOTP = 2,
-    BOTH = 3
+    Dhcp = 1,
+    Bootp = 2,
+    Both = 3
 }
 
 impl From<u8> for ReservationClientTypes {
     fn from(value: u8) -> Self {
         match value {
-            1 => ReservationClientTypes::DHCP,
-            2 => ReservationClientTypes::BOOTP,
-            _n => ReservationClientTypes::BOTH,
+            1 => ReservationClientTypes::Dhcp,
+            2 => ReservationClientTypes::Bootp,
+            _n => ReservationClientTypes::Both,
         }
     }
 }
@@ -23,9 +23,9 @@ impl From<u8> for ReservationClientTypes {
 impl From<ReservationClientTypes> for u8 {
     fn from(value: ReservationClientTypes) -> Self {
         match value {
-            ReservationClientTypes::DHCP => 1,
-            ReservationClientTypes::BOOTP => 2,
-            ReservationClientTypes::BOTH => 3,
+            ReservationClientTypes::Dhcp => 1,
+            ReservationClientTypes::Bootp => 2,
+            ReservationClientTypes::Both => 3,
         }
     }
 }

@@ -251,7 +251,7 @@ impl Subnet {
     pub fn get_reservations(&self) -> Result<HashMap<Ipv4Addr, Reservation>, u32> {
         let reservations: Vec<Reservation> = self.get_elements()?;
 
-        if reservations.len() == 0 { return Ok(HashMap::new()); }
+        if reservations.is_empty() { return Ok(HashMap::new()); }
 
         let mut ret = HashMap::with_capacity(reservations.len());
 
@@ -265,12 +265,12 @@ impl Subnet {
     pub fn add_reservation(
         &self,
         reservationaddress: Ipv4Addr,
-        macaddress: &Vec<u8>,
+        macaddress: &[u8],
     ) -> WinDhcpResult<()> {
         let mut reservation = Reservation {
             ip_address: reservationaddress,
-            for_client: macaddress.clone(),
-            allowed_client_types: ReservationClientTypes::BOTH,
+            for_client: macaddress.to_owned(),
+            allowed_client_types: ReservationClientTypes::Both,
         };
         match self.add_element(&mut reservation) {
             Ok(_) => Ok(()),
@@ -278,11 +278,11 @@ impl Subnet {
         }
     }
 
-    pub fn remove_reservation(&self, reservationaddress: Ipv4Addr, macaddress: &Vec<u8>) -> WinDhcpResult<()> {
+    pub fn remove_reservation(&self, reservationaddress: Ipv4Addr, macaddress: &[u8]) -> WinDhcpResult<()> {
         let mut reservation = Reservation {
             ip_address: reservationaddress,
-            for_client: macaddress.clone(),
-            allowed_client_types: ReservationClientTypes::BOTH,
+            for_client: macaddress.to_owned(),
+            allowed_client_types: ReservationClientTypes::Both,
         };
         
         match self.remove_element(&mut reservation) {
