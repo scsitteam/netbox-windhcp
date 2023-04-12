@@ -2,7 +2,6 @@ use ipnet::Ipv4Net;
 use log::info;
 use serde::Deserialize;
 use std::{collections::HashMap, fmt, net::Ipv4Addr, ptr};
-use std::ffi::c_void;
 use windows::{
     core::{HSTRING, PCWSTR, PWSTR},
     Win32::NetworkManagement::Dhcp::*,
@@ -12,6 +11,10 @@ use super::{WinDhcpError, WinDhcpResult};
 
 mod options;
 use self::options::*;
+mod elements;
+use self::elements::*;
+pub mod reservation;
+use self::reservation::*;
 
 #[derive(Debug)]
 pub struct Subnet {
@@ -37,46 +40,6 @@ impl Subnet {
             0 => Ok(()),
             n => Err(n),
         }
-    }
-
-    fn get_elements(
-        &self,
-        enumelementtype: DHCP_SUBNET_ELEMENT_TYPE,
-    ) -> Result<Option<DHCP_SUBNET_ELEMENT_INFO_ARRAY_V5>, u32> {
-        let mut resumehandle: u32 = 0;
-        let mut elementsread: u32 = 0;
-        let mut elementstotal: u32 = 0;
-
-        let mut enumelementinfo: *mut DHCP_SUBNET_ELEMENT_INFO_ARRAY_V5 = ptr::null_mut();
-
-        match unsafe {
-            DhcpEnumSubnetElementsV5(
-                &self.serveripaddress,
-                self.subnetaddress,
-                enumelementtype,
-                &mut resumehandle,
-                0xFFFFFFFF,
-                &mut enumelementinfo,
-                &mut elementsread,
-                &mut elementstotal,
-            )
-        } {
-            0 => (),
-            //ERROR_NO_MORE_ITEMS
-            259 => {
-                return Ok(None);
-            }
-            n => {
-                return Err(n);
-            }
-        }
-
-        let data: DHCP_SUBNET_ELEMENT_INFO_ARRAY_V5 = unsafe { *enumelementinfo };
-
-        #[cfg(feature = "rpc_free")]
-        unsafe { DhcpRpcFreeMemory(enumelementinfo as *mut c_void); };
-
-        Ok(Some(data))
     }
 
     fn remove_option(&self, optionid: u32) -> Result<(), u32> {
@@ -281,24 +244,16 @@ impl Subnet {
         self.set_options(OPTION_DOMAIN_NAME_SERVERS, servers)
     }
 
-    pub fn get_reservations(&self) -> Result<HashMap<Ipv4Addr, Vec<u8>>, u32> {
-        let reservations = self.get_elements(DhcpReservedIps)?;
-        if reservations.is_none() { return Ok(HashMap::new()); }
-        let reservations = reservations.unwrap();
+    pub fn get_reservations(&self) -> Result<HashMap<Ipv4Addr, Reservation>, u32> {
+        let reservations: Vec<Reservation> = self.get_elements()?;
 
-        let mut ret = HashMap::with_capacity(reservations.NumElements as usize);
+        if reservations.len() == 0 { return Ok(HashMap::new()); }
 
-        for idx in 0..reservations.NumElements {
-            let reservation = unsafe { *(*reservations.Elements.offset(idx.try_into().unwrap())).Element.ReservedIp };
+        let mut ret = HashMap::with_capacity(reservations.len());
 
-            let vec_len = unsafe { (*reservation.ReservedForClient).DataLength } as usize;
-
-            ret.insert(Ipv4Addr::from(reservation.ReservedIpAddress), unsafe {
-                Vec::from_raw_parts((*reservation.ReservedForClient).Data, vec_len, vec_len)[5..].to_vec().clone()
-            });
+        for reservation in reservations.into_iter() {
+            ret.insert(reservation.ip_address, reservation);
         }
-        #[cfg(feature = "rpc_free")]
-        unsafe { DhcpRpcFreeMemory(reservations.Elements as *mut c_void); };
 
         Ok(ret)
     }
@@ -308,60 +263,27 @@ impl Subnet {
         reservationaddress: Ipv4Addr,
         macaddress: &Vec<u8>,
     ) -> WinDhcpResult<()> {
-        let mut reserved_for_client = DHCP_BINARY_DATA {
-            DataLength: macaddress.len() as u32,
-            Data: macaddress.clone().as_mut_ptr(),
+        let mut reservation = Reservation {
+            ip_address: reservationaddress,
+            for_client: macaddress.clone(),
+            allowed_client_types: ReservationClientTypes::BOTH,
         };
-        let mut reserved_ip = DHCP_IP_RESERVATION_V4 {
-            ReservedIpAddress: u32::from(reservationaddress),
-            ReservedForClient: &mut reserved_for_client,
-            bAllowedClientTypes: 3
-        };
-        let addelementinfo = DHCP_SUBNET_ELEMENT_DATA_V5{
-            ElementType: DhcpReservedIps,
-            Element: DHCP_SUBNET_ELEMENT_DATA_V5_0 {
-                ReservedIp: &mut reserved_ip
-            }
-        };
-
-        match unsafe { DhcpAddSubnetElementV5(&self.serveripaddress, self.subnetaddress, &addelementinfo) } {
-            0 => Ok(()),
-            e => Err(WinDhcpError::new("adding reservation", e)),
+        match self.add_element(&mut reservation) {
+            Ok(_) => Ok(()),
+            Err(e) => Err(WinDhcpError::new("adding reservation", e)),
         }
     }
 
     pub fn remove_reservation(&self, reservationaddress: Ipv4Addr, macaddress: &Vec<u8>) -> WinDhcpResult<()> {
-        let mut data: Vec<u8> = Ipv4Addr::from(self.subnetaddress).octets().into_iter().rev()
-            .chain(::std::iter::once(0x01))
-            .chain(macaddress.clone().into_iter())
-            .collect();
-
-        let mut reserved_for_client = DHCP_BINARY_DATA {
-            DataLength: macaddress.len() as u32,
-            Data: data.as_mut_ptr(),
+        let mut reservation = Reservation {
+            ip_address: reservationaddress,
+            for_client: macaddress.clone(),
+            allowed_client_types: ReservationClientTypes::BOTH,
         };
-        let mut reserved_ip = DHCP_IP_RESERVATION_V4 {
-            ReservedIpAddress: u32::from(reservationaddress),
-            ReservedForClient: &mut reserved_for_client,
-            bAllowedClientTypes: 3,
-        };
-        let removeelementinfo = DHCP_SUBNET_ELEMENT_DATA_V5 {
-            ElementType: DhcpReservedIps,
-            Element: DHCP_SUBNET_ELEMENT_DATA_V5_0 {
-                ReservedIp: &mut reserved_ip,
-            },
-        };
-
-        match unsafe {
-            DhcpRemoveSubnetElementV5(
-                &self.serveripaddress,
-                self.subnetaddress,
-                &removeelementinfo,
-                DhcpFullForce,
-            )
-        } {
-            0 => Ok(()),
-            e => Err(WinDhcpError::new("removing reservation", e)),
+        
+        match self.remove_element(&mut reservation) {
+            Ok(_) => Ok(()),
+            Err(e) => Err(WinDhcpError::new("adding reservation", e)),
         }
     }
 
@@ -417,12 +339,6 @@ impl Subnet {
         let net = Ipv4Net::with_netmask(Ipv4Addr::from(self.subnetaddress), self.subnet_mask).expect("Unable to create net");
         net.broadcast().into()
     }
-}
-
-#[derive(Debug, PartialEq, Eq)]
-pub struct Reservation {
-    pub ipaddress: Ipv4Addr,
-    pub mac: Vec<u8>,
 }
 
 #[derive(Debug, Default, Deserialize, Clone, PartialEq, Eq)]
@@ -491,63 +407,5 @@ impl From<&DnsFlags> for u32 {
         if flags.disable_ptr_update { f += DNS_FLAG_DISABLE_PTR_UPDATE; }
 
         f
-    }
-}
-
-pub trait SubnetElements<T> {
-    fn get_first_element(&self) -> Result<Option<T>, u32>;
-    fn add_element(&self, element: &mut T) -> Result<(), u32>;
-}
-
-impl SubnetElements<DHCP_BOOTP_IP_RANGE> for Subnet {
-    fn get_first_element(&self) -> Result<Option<DHCP_BOOTP_IP_RANGE>, u32> {
-        let mut resumehandle: u32 = 0;
-        let mut elementsread: u32 = 0;
-        let mut elementstotal: u32 = 0;
-
-        let mut enumelementinfo: *mut DHCP_SUBNET_ELEMENT_INFO_ARRAY_V5 = ptr::null_mut();
-
-        match unsafe {
-            DhcpEnumSubnetElementsV5(
-                &self.serveripaddress,
-                self.subnetaddress,
-                DhcpIpRangesDhcpBootp,
-                &mut resumehandle,
-                0xFFFFFFFF,
-                &mut enumelementinfo,
-                &mut elementsread,
-                &mut elementstotal,
-            )
-        } {
-            0 => unsafe {
-                let range = DHCP_BOOTP_IP_RANGE { ..(*(*(*enumelementinfo).Elements).Element.IpRange) };
-
-                DhcpRpcFreeMemory((*enumelementinfo).Elements as *mut c_void); 
-                DhcpRpcFreeMemory(enumelementinfo as *mut c_void);
-
-                Ok(Some(range))
-            },
-            //ERROR_NO_MORE_ITEMS
-            259 => {
-                Ok(None)
-            },
-            n => {
-                Err(n)
-            }
-        }
-    }
-
-    fn add_element(&self, element: &mut DHCP_BOOTP_IP_RANGE) -> Result<(), u32> {
-        let addelementinfo = DHCP_SUBNET_ELEMENT_DATA_V5  {
-            ElementType: DhcpIpRangesDhcpBootp,
-            Element: DHCP_SUBNET_ELEMENT_DATA_V5_0 {
-                IpRange: element,
-            },
-        };
-
-        match unsafe { DhcpAddSubnetElementV5(&self.serveripaddress, self.subnetaddress, &addelementinfo) } {
-            0 => Ok(()),
-            n => Err(n),
-        }
     }
 }
