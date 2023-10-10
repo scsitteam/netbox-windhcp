@@ -1,5 +1,5 @@
 use ipnet::Ipv4Net;
-use log::info;
+use log::{info, trace};
 use serde::Deserialize;
 use std::{collections::HashMap, fmt, net::Ipv4Addr, ptr};
 #[cfg(feature = "rpc_free")]
@@ -24,10 +24,14 @@ pub struct Subnet {
 }
 
 impl Subnet {
+
     fn get_subnet_info(&self) -> Result<DHCP_SUBNET_INFO, u32> {
         let mut subnetinfo: *mut DHCP_SUBNET_INFO = ptr::null_mut();
 
-        match unsafe { DhcpGetSubnetInfo(&self.serveripaddress, self.subnetaddress, &mut subnetinfo) } {
+        match unsafe {
+            trace!("Call DhcpGetSubnetInfo({}, {}, ptr)", &self.serveripaddress, self.subnetaddress);
+            DhcpGetSubnetInfo(&self.serveripaddress, self.subnetaddress, &mut subnetinfo)
+        } {
             0 => Ok(unsafe{*subnetinfo}),
             n => Err(n),
         }
@@ -446,12 +450,13 @@ impl Subnet {
         }
     }
 
-    pub fn get_clients_state(&self) -> WinDhcpResult<HashMap<Ipv4Addr, u8>> {
+    pub fn get_active_clients(&self) -> WinDhcpResult<Vec<Ipv4Addr>> {
         let mut resumehandle: u32 = 0;
         let mut clientsread: u32 = 0;
         let mut clientstotal: u32 = 0;
 
         let mut clientinfo: *mut DHCP_CLIENT_INFO_ARRAY_V5 = ptr::null_mut();
+        let mut ret = Vec::new();
 
         match unsafe {
             DhcpEnumSubnetClientsV5(
@@ -467,21 +472,20 @@ impl Subnet {
             0 => (),
             //ERROR_NO_MORE_ITEMS
             259 => {
-                return Ok(HashMap::with_capacity(0));
+                return Ok(ret);
             }
             e => return Err(WinDhcpError::new("listing clients", e)),
         }
         
-        let mut ret = HashMap::with_capacity(unsafe{*clientinfo}.NumElements as usize);
 
         for idx in 0..unsafe{*clientinfo}.NumElements {
             let client = unsafe { **(*clientinfo).Clients.offset(idx.try_into().unwrap()) };
 
-            if (client.bClientType & 0x04) == 0x00 {
+            if client.ClientLeaseExpires.dwHighDateTime == 0 && client.ClientLeaseExpires.dwLowDateTime == 0 {
                 continue
             }
 
-            ret.insert(Ipv4Addr::from(client.ClientIpAddress), client.AddressState);
+            ret.push(Ipv4Addr::from(client.ClientIpAddress));
         }
 
         #[cfg(feature = "rpc_free")]

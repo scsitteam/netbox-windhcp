@@ -76,15 +76,20 @@ impl NetboxApi {
     }
 
     pub fn set_ip_last_active(&self, ip: Ipv4Addr, subnet: Ipv4Net) -> Result<(), ureq::Error> {
-        let filter: HashMap<String, String> = HashMap::from([
+        let mut filter: HashMap<String, String> = HashMap::from([
             (String::from("address"), ip.to_string()),
             (String::from("mask_length"), subnet.prefix_len().to_string())
         ]);
+        filter.extend(self.config.reservation_filter(&subnet));
 
         let ips: Vec<IpAddress> = self.get_objects("ipam/ip-addresses/", &filter)?;
 
-        if ips.len() != 1 {
-            warn!("Not exactly one IPAddress foudn for ip {}", ip);
+        if ips.len() == 0 {
+            return Ok(())
+        }
+
+        if ips.len() > 1 {
+            warn!("More the one IPAddress foudn for ip {}", ip);
             return Ok(())
         }
 

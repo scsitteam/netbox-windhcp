@@ -78,11 +78,11 @@ impl Sync {
 
             /* Update Reservation Last Use */
             if self.config.netbox.last_used() {
-                for (ip, state) in subnet.get_clients_state()? {
-                    if (state & 0xF0) == 0x00 { continue; }
+                for ip in subnet.get_active_clients()? {
+                    println!("Active {}", ip);
                     match self.netbox.set_ip_last_active(ip, prefix.prefix()) {
                         Ok(_) => {},
-                        Err(_) => error!("  Reservation {}: Updating last used.", ip),
+                        Err(e) => error!("  Reservation {}: Updating last used. {}", ip, e),
                     }
                 }
             }
