@@ -6,6 +6,7 @@ pub mod config;
 use self::netbox::address::{AssignedObject, IpAddress};
 use self::netbox::prefix::Prefix;
 use self::netbox::range::IpRange;
+use self::windhcp::reservation::Reservation;
 use self::{config::SyncConfig, netbox::NetboxApi};
 mod mac;
 use self::mac::MacAddr;
@@ -72,8 +73,8 @@ impl Sync {
 
             /* Cleanup old Reservations */
             for (reservationaddress, macaddress) in dhcp_reservations {
-                if !self.noop { subnet.remove_reservation(reservationaddress, &macaddress)?; }
-                info!("  Reservation {}: Remove Reservation {}", &reservationaddress, &macaddress.as_mac());
+                if !self.noop { subnet.remove_reservation(reservationaddress, &macaddress.for_client)?; }
+                info!("  Reservation {}: Remove Reservation {}", &reservationaddress, &macaddress.for_client.as_mac());
             }
 
             /* Update Reservation Last Use */
@@ -188,7 +189,7 @@ impl Sync {
         &self,
         subnet: &Subnet,
         reservation: &IpAddress,
-        dhcp_mac: Option<Vec<u8>>,
+        dhcp_reservation: Option<Reservation>,
     ) -> Result<(), Box<dyn std::error::Error + Send + std::marker::Sync>> {
         let mac = match self.get_macaddress_for_reservation(reservation)? {
             Some(mac) => mac,
@@ -199,7 +200,7 @@ impl Sync {
         };
 
         /* Reservation */
-        if let Some(macaddress) = dhcp_mac {
+        if let Some(macaddress) = dhcp_reservation.map(|r| r.for_client) {
             if macaddress != mac {
                 if !self.noop {
                     subnet.remove_reservation(reservation.address(), &macaddress)?;
@@ -209,6 +210,7 @@ impl Sync {
             }
         } else {
             if !self.noop { subnet.add_reservation(reservation.address(), &mac)?; }
+
             info!("  Reservation {}: Create Reservation {:?}", &reservation.address(), &mac.as_mac());
         }
 

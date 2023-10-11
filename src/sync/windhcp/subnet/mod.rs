@@ -2,8 +2,6 @@ use ipnet::Ipv4Net;
 use log::{info, trace};
 use serde::Deserialize;
 use std::{collections::HashMap, fmt, net::Ipv4Addr, ptr};
-#[cfg(feature = "rpc_free")]
-use std::ffi::c_void;
 use windows::{
     core::{HSTRING, PCWSTR, PWSTR},
     Win32::NetworkManagement::Dhcp::*,
@@ -13,6 +11,10 @@ use super::{WinDhcpError, WinDhcpResult};
 
 mod options;
 use self::options::*;
+mod elements;
+use self::elements::*;
+pub mod reservation;
+use self::reservation::*;
 
 #[derive(Debug)]
 pub struct Subnet {
@@ -39,103 +41,6 @@ impl Subnet {
 
     fn set_subnet_info(&self, subnetinfo: DHCP_SUBNET_INFO) -> Result<(), u32> {
         match unsafe { DhcpSetSubnetInfo(&self.serveripaddress, self.subnetaddress, &subnetinfo) } {
-            0 => Ok(()),
-            n => Err(n),
-        }
-    }
-
-    fn get_elements(
-        &self,
-        enumelementtype: DHCP_SUBNET_ELEMENT_TYPE,
-    ) -> Result<Option<DHCP_SUBNET_ELEMENT_INFO_ARRAY_V5>, u32> {
-        let mut resumehandle: u32 = 0;
-        let mut elementsread: u32 = 0;
-        let mut elementstotal: u32 = 0;
-
-        let mut enumelementinfo: *mut DHCP_SUBNET_ELEMENT_INFO_ARRAY_V5 = ptr::null_mut();
-
-        match unsafe {
-            DhcpEnumSubnetElementsV5(
-                &self.serveripaddress,
-                self.subnetaddress,
-                enumelementtype,
-                &mut resumehandle,
-                0xFFFFFFFF,
-                &mut enumelementinfo,
-                &mut elementsread,
-                &mut elementstotal,
-            )
-        } {
-            0 => (),
-            //ERROR_NO_MORE_ITEMS
-            259 => {
-                return Ok(None);
-            }
-            n => {
-                return Err(n);
-            }
-        }
-
-        let data: DHCP_SUBNET_ELEMENT_INFO_ARRAY_V5 = unsafe { *enumelementinfo };
-
-        #[cfg(feature = "rpc_free")]
-        unsafe { DhcpRpcFreeMemory(enumelementinfo as *mut c_void); };
-
-        Ok(Some(data))
-    }
-
-    fn get_first_element(
-        &self,
-        enumelementtype: DHCP_SUBNET_ELEMENT_TYPE,
-    ) -> Result<DHCP_SUBNET_ELEMENT_DATA_V5, u32> {
-        let mut resumehandle: u32 = 0;
-        let mut elementsread: u32 = 0;
-        let mut elementstotal: u32 = 0;
-
-        let mut enumelementinfo: *mut DHCP_SUBNET_ELEMENT_INFO_ARRAY_V5 = ptr::null_mut();
-
-        match unsafe {
-            DhcpEnumSubnetElementsV5(
-                &self.serveripaddress,
-                self.subnetaddress,
-                enumelementtype,
-                &mut resumehandle,
-                0xFFFFFFFF,
-                &mut enumelementinfo,
-                &mut elementsread,
-                &mut elementstotal,
-            )
-        } {
-            0 => (),
-            n => {
-                return Err(n);
-            }
-        }
-
-        let data: DHCP_SUBNET_ELEMENT_DATA_V5 = unsafe { *(*enumelementinfo).Elements };
-
-        #[cfg(feature = "rpc_free")]
-        if unsafe { (*enumelementinfo).NumElements } > 1 {
-            for idx in 1..unsafe { (*enumelementinfo).NumElements } {
-                let ptr = unsafe { (*enumelementinfo).Elements.offset(idx.try_into().unwrap()) };
-                
-                unsafe {
-                    DhcpRpcFreeMemory(ptr as *mut c_void);
-                };
-            }
-        }
-        
-        #[cfg(feature = "rpc_free")]
-        unsafe {
-            DhcpRpcFreeMemory((*enumelementinfo).Elements as *mut c_void); 
-            DhcpRpcFreeMemory(enumelementinfo as *mut c_void);
-        };
-
-        Ok(data)
-    }
-
-    fn add_element(&self, addelementinfo: &DHCP_SUBNET_ELEMENT_DATA_V5) -> Result<(), u32> {
-        match unsafe { DhcpAddSubnetElementV5(&self.serveripaddress, self.subnetaddress, addelementinfo) } {
             0 => Ok(()),
             n => Err(n),
         }
@@ -250,21 +155,11 @@ impl Subnet {
     }
 
     pub fn get_subnet_range(&self) -> WinDhcpResult<(Ipv4Addr, Ipv4Addr)> {
-        let data = match self.get_first_element(DhcpIpRangesDhcpBootp) {
-            Ok(data) => data,
-            //ERROR_NO_MORE_ITEMS
-            Err(259) => { return Ok((Ipv4Addr::from(0), Ipv4Addr::from(0))); },
-            Err(e) => return Err(WinDhcpError::new("getting subnet range", e)),
-        };
-
-        let ret = (
-            Ipv4Addr::from(unsafe { (*data.Element.IpRange).StartAddress }),
-            Ipv4Addr::from(unsafe { (*data.Element.IpRange).EndAddress }),
-        );
-
-        //unsafe { DhcpRpcFreeMemory(&mut data as *mut c_void) };
-
-        Ok(ret)
+        match SubnetElements::<DHCP_BOOTP_IP_RANGE>::get_first_element(self) {
+            Ok(Some(range)) => Ok((Ipv4Addr::from(range.StartAddress), Ipv4Addr::from(range.EndAddress))),
+            Ok(None) => Ok((Ipv4Addr::from(0), Ipv4Addr::from(0))),
+            Err(e) => Err(WinDhcpError::new("getting subnet range", e)),
+        }
     }
 
     pub fn set_subnet_range(
@@ -275,49 +170,36 @@ impl Subnet {
         let start_address = u32::from(start_address);
         let end_address = u32::from(end_address);
 
-        let mut data = match self.get_first_element(DhcpIpRangesDhcpBootp) {
-            Ok(data) => data,
-            //ERROR_NO_MORE_ITEMS
-            Err(259) => {
-                let mut ip_range = DHCP_BOOTP_IP_RANGE {
-                    StartAddress: std::u32::MAX,
-                    EndAddress: 0u32,
-                    BootpAllocated: 0u32,
-                    MaxBootpAllowed: 0u32,
-                };
-                DHCP_SUBNET_ELEMENT_DATA_V5 {
-                    ElementType: DhcpIpRangesDhcpBootp,
-                    Element: DHCP_SUBNET_ELEMENT_DATA_V5_0 {
-                        IpRange: &mut ip_range,
-                    },
-                }
+        let mut range = match SubnetElements::<DHCP_BOOTP_IP_RANGE>::get_first_element(self) {
+            Ok(Some(range)) => range,
+            Ok(None) => DHCP_BOOTP_IP_RANGE {
+                StartAddress: std::u32::MAX,
+                EndAddress: 0u32,
+                BootpAllocated: 0u32,
+                MaxBootpAllowed: 0u32,
             },
             Err(e) => return Err(WinDhcpError::new("getting subnet range", e)),
         };
 
-        unsafe {
-            (*data.Element.IpRange).StartAddress = std::cmp::max(
-                std::cmp::min((*data.Element.IpRange).StartAddress, start_address),
-                self.get_range_min()
-            );
+        range.StartAddress = std::cmp::max(
+            std::cmp::min(range.StartAddress, start_address),
+            self.get_range_min()
+        );
 
-            (*data.Element.IpRange).EndAddress = std::cmp::min(
-                std::cmp::max((*data.Element.IpRange).EndAddress, end_address),
-                self.get_range_max()
-            );
-            info!("Set range to {} - {}", Ipv4Addr::from((*data.Element.IpRange).StartAddress), Ipv4Addr::from((*data.Element.IpRange).EndAddress));
-        }
+        range.EndAddress = std::cmp::min(
+            std::cmp::max(range.EndAddress, end_address),
+            self.get_range_max()
+        );
+        info!("Set range to {} - {}", Ipv4Addr::from(range.StartAddress), Ipv4Addr::from(range.EndAddress));
 
-        self.add_element(&data)
+        self.add_element(&mut range)
             .map_err(|e| WinDhcpError::new("setting subnet range to ", e))?;
 
-        unsafe {
-            (*data.Element.IpRange).StartAddress = start_address;
-            (*data.Element.IpRange).EndAddress = end_address;
-            info!("Set range to {} - {}", Ipv4Addr::from((*data.Element.IpRange).StartAddress), Ipv4Addr::from((*data.Element.IpRange).EndAddress));
-        }
+        range.StartAddress = start_address;
+        range.EndAddress = end_address;
+        info!("Set range to {} - {}", Ipv4Addr::from(range.StartAddress), Ipv4Addr::from(range.EndAddress));
 
-        self.add_element(&data)
+        self.add_element(&mut range)
             .map_err(|e| WinDhcpError::new("setting subnet range2", e))?;
 
         //unsafe { DhcpRpcFreeMemory(data as *mut c_void) };
@@ -366,24 +248,16 @@ impl Subnet {
         self.set_options(OPTION_DOMAIN_NAME_SERVERS, servers)
     }
 
-    pub fn get_reservations(&self) -> Result<HashMap<Ipv4Addr, Vec<u8>>, u32> {
-        let reservations = self.get_elements(DhcpReservedIps)?;
-        if reservations.is_none() { return Ok(HashMap::new()); }
-        let reservations = reservations.unwrap();
+    pub fn get_reservations(&self) -> Result<HashMap<Ipv4Addr, Reservation>, u32> {
+        let reservations: Vec<Reservation> = self.get_elements()?;
 
-        let mut ret = HashMap::with_capacity(reservations.NumElements as usize);
+        if reservations.is_empty() { return Ok(HashMap::new()); }
 
-        for idx in 0..reservations.NumElements {
-            let reservation = unsafe { *(*reservations.Elements.offset(idx.try_into().unwrap())).Element.ReservedIp };
+        let mut ret = HashMap::with_capacity(reservations.len());
 
-            let vec_len = unsafe { (*reservation.ReservedForClient).DataLength } as usize;
-
-            ret.insert(Ipv4Addr::from(reservation.ReservedIpAddress), unsafe {
-                Vec::from_raw_parts((*reservation.ReservedForClient).Data, vec_len, vec_len)[5..].to_vec().clone()
-            });
+        for reservation in reservations.into_iter() {
+            ret.insert(reservation.ip_address, reservation);
         }
-        #[cfg(feature = "rpc_free")]
-        unsafe { DhcpRpcFreeMemory(reservations.Elements as *mut c_void); };
 
         Ok(ret)
     }
@@ -391,62 +265,29 @@ impl Subnet {
     pub fn add_reservation(
         &self,
         reservationaddress: Ipv4Addr,
-        macaddress: &Vec<u8>,
+        macaddress: &[u8],
     ) -> WinDhcpResult<()> {
-        let mut reserved_for_client = DHCP_BINARY_DATA {
-            DataLength: macaddress.len() as u32,
-            Data: macaddress.clone().as_mut_ptr(),
+        let mut reservation = Reservation {
+            ip_address: reservationaddress,
+            for_client: macaddress.to_owned(),
+            allowed_client_types: ReservationClientTypes::Both,
         };
-        let mut reserved_ip = DHCP_IP_RESERVATION_V4 {
-            ReservedIpAddress: u32::from(reservationaddress),
-            ReservedForClient: &mut reserved_for_client,
-            bAllowedClientTypes: 3
-        };
-        let addelementinfo = DHCP_SUBNET_ELEMENT_DATA_V5{
-            ElementType: DhcpReservedIps,
-            Element: DHCP_SUBNET_ELEMENT_DATA_V5_0 {
-                ReservedIp: &mut reserved_ip
-            }
-        };
-
-        match unsafe { DhcpAddSubnetElementV5(&self.serveripaddress, self.subnetaddress, &addelementinfo) } {
-            0 => Ok(()),
-            e => Err(WinDhcpError::new("adding reservation", e)),
+        match self.add_element(&mut reservation) {
+            Ok(_) => Ok(()),
+            Err(e) => Err(WinDhcpError::new("adding reservation", e)),
         }
     }
 
-    pub fn remove_reservation(&self, reservationaddress: Ipv4Addr, macaddress: &Vec<u8>) -> WinDhcpResult<()> {
-        let mut data: Vec<u8> = Ipv4Addr::from(self.subnetaddress).octets().into_iter().rev()
-            .chain(::std::iter::once(0x01))
-            .chain(macaddress.clone().into_iter())
-            .collect();
-
-        let mut reserved_for_client = DHCP_BINARY_DATA {
-            DataLength: macaddress.len() as u32,
-            Data: data.as_mut_ptr(),
+    pub fn remove_reservation(&self, reservationaddress: Ipv4Addr, macaddress: &[u8]) -> WinDhcpResult<()> {
+        let mut reservation = Reservation {
+            ip_address: reservationaddress,
+            for_client: macaddress.to_owned(),
+            allowed_client_types: ReservationClientTypes::Both,
         };
-        let mut reserved_ip = DHCP_IP_RESERVATION_V4 {
-            ReservedIpAddress: u32::from(reservationaddress),
-            ReservedForClient: &mut reserved_for_client,
-            bAllowedClientTypes: 3,
-        };
-        let removeelementinfo = DHCP_SUBNET_ELEMENT_DATA_V5 {
-            ElementType: DhcpReservedIps,
-            Element: DHCP_SUBNET_ELEMENT_DATA_V5_0 {
-                ReservedIp: &mut reserved_ip,
-            },
-        };
-
-        match unsafe {
-            DhcpRemoveSubnetElementV5(
-                &self.serveripaddress,
-                self.subnetaddress,
-                &removeelementinfo,
-                DhcpFullForce,
-            )
-        } {
-            0 => Ok(()),
-            e => Err(WinDhcpError::new("removing reservation", e)),
+        
+        match self.remove_element(&mut reservation) {
+            Ok(_) => Ok(()),
+            Err(e) => Err(WinDhcpError::new("adding reservation", e)),
         }
     }
 
@@ -502,12 +343,6 @@ impl Subnet {
         let net = Ipv4Net::with_netmask(Ipv4Addr::from(self.subnetaddress), self.subnet_mask).expect("Unable to create net");
         net.broadcast().into()
     }
-}
-
-#[derive(Debug, PartialEq, Eq)]
-pub struct Reservation {
-    pub ipaddress: Ipv4Addr,
-    pub mac: Vec<u8>,
 }
 
 #[derive(Debug, Default, Deserialize, Clone, PartialEq, Eq)]
