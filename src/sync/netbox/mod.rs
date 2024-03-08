@@ -1,13 +1,10 @@
 pub(super) mod model;
 
 use std::collections::HashMap;
-use std::net::Ipv4Addr;
 
-use chrono::Utc;
 use ipnet::Ipv4Net;
-use log::{debug, warn};
+use log::debug;
 use serde::Deserialize;
-use serde_json::json;
 use ureq::{Request, MiddlewareNext, Response, Error};
 
 pub mod config;
@@ -73,42 +70,6 @@ impl NetboxApi {
 
     pub fn get_router_for_subnet(&self, subnet: &Ipv4Net) -> Result<Vec<IpAddress>, ureq::Error> {
         self.get_objects("ipam/ip-addresses/", &self.config.router_filter(subnet))
-    }
-
-    pub fn set_ip_last_active(&self, ip: Ipv4Addr, subnet: Ipv4Net) -> Result<(), ureq::Error> {
-        let mut filter: HashMap<String, String> = HashMap::from([
-            (String::from("address"), ip.to_string()),
-            (String::from("mask_length"), subnet.prefix_len().to_string())
-        ]);
-        filter.extend(self.config.reservation_filter(&subnet));
-
-        let ips: Vec<IpAddress> = self.get_objects("ipam/ip-addresses/", &filter)?;
-
-        if ips.len() == 0 {
-            return Ok(())
-        }
-
-        if ips.len() > 1 {
-            warn!("More the one IPAddress foudn for ip {}", ip);
-            return Ok(())
-        }
-
-        if ips[0].dhcp_reservation_last_active() == Some(Utc::now().date_naive()) {
-            debug!("Skip last_active update for {}", ips[0].address());
-            return Ok(())
-        }
-
-        let payload = json!({
-            "custom_fields": {
-                "dhcp_reservation_last_active": Utc::now().date_naive().to_string(),
-            }
-        });
-
-        self.client.patch(ips[0].url())
-            .set("Content-Type", "application/json")
-            .send_string(payload.to_string().as_str())?;
-
-        Ok(())
     }
 
     fn get_objects<T: for<'a> Deserialize<'a>>(

@@ -8,7 +8,6 @@ use serde::Deserialize;
 pub struct SyncNetboxConfig {
     apiurl: String,
     token: String,
-    last_used: bool,
     prefix_filter: HashMap<String, String>,
     range_filter: HashMap<String, String>,
     reservation_filter: HashMap<String, String>,
@@ -20,7 +19,6 @@ impl Default for SyncNetboxConfig {
         Self {
             apiurl: Default::default(),
             token: Default::default(),
-            last_used: false,
             prefix_filter: HashMap::from([
                 (String::from("tag"), String::from("dhcp")),
                 (String::from("status"), String::from("active")),
@@ -50,10 +48,6 @@ impl SyncNetboxConfig {
 
     pub fn token(&self) -> &str {
         self.token.as_ref()
-    }
-
-    pub fn last_used(&self) -> bool {
-        self.last_used
     }
 
     pub fn prefix_filter(&self) -> &HashMap<String, String> {

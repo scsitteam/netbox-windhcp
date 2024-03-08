@@ -19,14 +19,14 @@ pub struct Config {
 }
 
 impl Config {
-    const CONFIG_FILE: &str = concat!(
+    const CONFIG_FILE: &'static str = concat!(
         "C:\\ProgramData\\",
         env!("CARGO_PKG_NAME"),
         "\\",
         env!("CARGO_PKG_NAME"),
         ".cfg"
     );
-    const CONFIG_FILE_LOCAL: &str = concat!("./", env!("CARGO_PKG_NAME"), ".cfg");
+    const CONFIG_FILE_LOCAL: &'static str = concat!("./", env!("CARGO_PKG_NAME"), ".cfg");
 
     pub fn load_from_file() -> Result<Self, Box<dyn Error>> {
         let file = File::open(Self::CONFIG_FILE).or(File::open(Self::CONFIG_FILE_LOCAL))?;
