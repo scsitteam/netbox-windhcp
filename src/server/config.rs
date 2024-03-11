@@ -15,7 +15,7 @@ pub struct WebhookConfig {
 
 impl WebhookConfig {
     pub fn sync_interval(&self) -> chrono::Duration {
-        chrono::Duration::seconds(self.sync_interval.unwrap_or(900))
+        chrono::Duration::try_seconds(self.sync_interval.unwrap_or(900)).expect("Should never fail")
     }
 
     pub fn sync_standoff_time(&self) -> Duration {

@@ -1,4 +1,5 @@
 use std::net::Ipv4Addr;
+use std::path::PathBuf;
 
 use serde::Deserialize;
 
@@ -10,6 +11,7 @@ use super::windhcp::DnsFlags;
 pub struct SyncConfig {
     pub netbox: SyncNetboxConfig,
     pub dhcp: SyncDhcpConfig,
+    pub logs: SyncLogConfig,
 }
 
 impl SyncConfig {
@@ -49,6 +51,11 @@ impl SyncDhcpConfig {
     pub fn default_dns_servers(&self) -> &[Ipv4Addr] {
         self.default_dns_servers.as_ref()
     }
+}
+
+#[derive(Debug, Deserialize, Clone)]
+pub struct SyncLogConfig {
+    pub dir: Option<PathBuf>,
 }
 
 #[cfg(test)]

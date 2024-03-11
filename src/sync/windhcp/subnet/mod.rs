@@ -291,50 +291,6 @@ impl Subnet {
         }
     }
 
-    pub fn get_active_clients(&self) -> WinDhcpResult<Vec<Ipv4Addr>> {
-        let mut resumehandle: u32 = 0;
-        let mut clientsread: u32 = 0;
-        let mut clientstotal: u32 = 0;
-
-        let mut clientinfo: *mut DHCP_CLIENT_INFO_ARRAY_V5 = ptr::null_mut();
-        let mut ret = Vec::new();
-
-        match unsafe {
-            DhcpEnumSubnetClientsV5(
-                &self.serveripaddress,
-                self.subnetaddress,
-                &mut resumehandle,
-                0xFFFFFFFF,
-                &mut clientinfo,
-                &mut clientsread,
-                &mut clientstotal
-            )
-        } {
-            0 => (),
-            //ERROR_NO_MORE_ITEMS
-            259 => {
-                return Ok(ret);
-            }
-            e => return Err(WinDhcpError::new("listing clients", e)),
-        }
-        
-
-        for idx in 0..unsafe{*clientinfo}.NumElements {
-            let client = unsafe { **(*clientinfo).Clients.offset(idx.try_into().unwrap()) };
-
-            if client.ClientLeaseExpires.dwHighDateTime == 0 && client.ClientLeaseExpires.dwLowDateTime == 0 {
-                continue
-            }
-
-            ret.push(Ipv4Addr::from(client.ClientIpAddress));
-        }
-
-        #[cfg(feature = "rpc_free")]
-        unsafe { DhcpRpcFreeMemory((*clientinfo).Clients as *mut c_void); };
-
-        Ok(ret)
-    }
-
     fn get_range_min(&self) -> u32 {
         self.subnetaddress + 1
     } 

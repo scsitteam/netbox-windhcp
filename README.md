@@ -38,7 +38,6 @@ sync:
             enabled: true
             cleanup_expired: true
             update_dhcid: true
-        last_used: true
     netbox:
         apiurl: https://netbox.example.ch/api/
         token: XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
