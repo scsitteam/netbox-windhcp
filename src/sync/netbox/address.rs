@@ -1,10 +1,12 @@
 use std::net::Ipv4Addr;
 
+use chrono::NaiveDate;
 use ipnet::Ipv4Net;
 use serde::Deserialize;
 
 #[derive(Debug, Deserialize)]
 pub struct IpAddress {
+    url: String,
     address: Ipv4Net,
     dns_name: String,
     description: String,
@@ -15,6 +17,7 @@ pub struct IpAddress {
 #[derive(Debug, Deserialize)]
 struct IpAddressCustomField {
     dhcp_reservation_mac: Option<String>,
+    dhcp_reservation_last_active: Option<NaiveDate>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -23,6 +26,10 @@ struct IpAddressAssignedObject {
 }
 
 impl IpAddress {
+    pub fn url(&self) -> &str {
+        self.url.as_ref()
+    }
+
     pub fn address(&self) -> Ipv4Addr {
         self.address.addr()
     }
@@ -37,6 +44,10 @@ impl IpAddress {
 
     pub fn reservation_mac(&self) -> Option<&String> {
         self.custom_fields.dhcp_reservation_mac.as_ref()
+    }
+
+    pub fn dhcp_reservation_last_active(&self) -> Option<NaiveDate> {
+        self.custom_fields.dhcp_reservation_last_active
     }
 
     pub fn assigned_object_url(&self) -> Option<&String> {

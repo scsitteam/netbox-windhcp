@@ -79,12 +79,16 @@
                     <Component Id="netbox_windhcp_sync" Guid="*">
                         <File Id="exe1" Name="netbox-windhcp-sync.exe" DiskId="1" Source="$(var.CargoTargetBinDir)\netbox-windhcp-sync.exe" KeyPath="yes" />
                     </Component>
+                    <Component Id="netbox_windhcp_log" Guid="*">
+                        <File Id="exe2" Name="netbox-windhcp-log.exe" DiskId="1" Source="$(var.CargoTargetBinDir)\netbox-windhcp-log.exe" KeyPath="yes" />
+                    </Component>
                 </Directory>
             </Directory>
         </Directory>
         <Feature Id="Binaries" Title="Application" Description="Installs all binaries and the service." Level="1" ConfigurableDirectory="APPLICATIONFOLDER" AllowAdvertise="no" Display="expand" Absent="disallow">
             <ComponentRef Id="netbox_windhcp_server" />
             <ComponentRef Id="netbox_windhcp_sync" />
+            <ComponentRef Id="netbox_windhcp_log" />
             <ComponentRef Id="netbox_windhcp_config" />
         </Feature>
         <SetProperty Id="ARPINSTALLLOCATION" Value="[APPLICATIONFOLDER]" After="CostFinalize" />

@@ -2,9 +2,11 @@ pub(super) mod model;
 
 use std::collections::HashMap;
 
+use chrono::NaiveDate;
 use ipnet::Ipv4Net;
 use log::debug;
 use serde::Deserialize;
+use serde_json::json;
 use ureq::{Request, MiddlewareNext, Response, Error};
 
 pub mod config;
@@ -64,12 +66,30 @@ impl NetboxApi {
         self.get_objects("ipam/ip-ranges/", self.config.range_filter())
     }
 
+    pub fn get_reservations(&self) -> Result<Vec<IpAddress>, ureq::Error> {
+        self.get_objects("ipam/ip-addresses/", &self.config.reservation_filter(None))
+    }
+
     pub fn get_reservations_for_subnet(&self, subnet: &Ipv4Net) -> Result<Vec<IpAddress>, ureq::Error> {
-        self.get_objects("ipam/ip-addresses/", &self.config.reservation_filter(subnet))
+        self.get_objects("ipam/ip-addresses/", &self.config.reservation_filter(Some(subnet)))
     }
 
     pub fn get_router_for_subnet(&self, subnet: &Ipv4Net) -> Result<Vec<IpAddress>, ureq::Error> {
         self.get_objects("ipam/ip-addresses/", &self.config.router_filter(subnet))
+    }
+
+    pub fn set_ip_last_active(&self, ip: &IpAddress, date: &NaiveDate) -> Result<(), ureq::Error> {
+        let payload = json!({
+            "custom_fields": {
+                "dhcp_reservation_last_active": date,
+            }
+        });
+
+        self.client.patch(ip.url())
+            .set("Content-Type", "application/json")
+            .send_string(payload.to_string().as_str())?;
+
+        Ok(())
     }
 
     fn get_objects<T: for<'a> Deserialize<'a>>(

@@ -58,9 +58,11 @@ impl SyncNetboxConfig {
         &self.range_filter
     }
 
-    pub fn reservation_filter(&self, parent: &Ipv4Net) -> HashMap<String, String> {
+    pub fn reservation_filter(&self, parent: Option<&Ipv4Net>) -> HashMap<String, String> {
         let mut filter = self.reservation_filter.clone();
-        filter.insert(String::from("parent"), parent.to_string());
+        if let Some(parent) = parent {
+            filter.insert(String::from("parent"), parent.to_string());
+        }
         filter
     }
 
@@ -118,7 +120,7 @@ mod tests {
     #[test]
     fn it_builds_the_reservation_filter() {
         let cfg = SyncNetboxConfig::default();
-        let filter = cfg.reservation_filter(&Ipv4Net::from_str("127.0.0.1/8").unwrap());
+        let filter = cfg.reservation_filter(Some(&Ipv4Net::from_str("127.0.0.1/8").unwrap()));
         assert_eq!(filter.get("parent").unwrap(), "127.0.0.1/8");
     }
 

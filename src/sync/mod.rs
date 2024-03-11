@@ -10,7 +10,7 @@ use self::windhcp::reservation::Reservation;
 use self::{config::SyncConfig, netbox::NetboxApi};
 mod mac;
 use self::mac::MacAddr;
-mod netbox;
+pub mod netbox;
 
 mod windhcp;
 use self::windhcp::{DnsFlags, Subnet, WinDhcp};
