@@ -951,7 +951,7 @@ dependencies = [
 
 [[package]]
 name = "netbox-windhcp"
-version = "0.9.9"
+version = "0.9.10"
 dependencies = [
  "bytes",
  "chrono",
