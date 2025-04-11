@@ -29,6 +29,7 @@ pub struct SyncDhcpConfig {
     default_dns_domain: Option<String>,
     #[serde(default)]
     default_dns_servers: Vec<Ipv4Addr>,
+    default_failover_relation: Option<String>,
 }
 
 impl SyncDhcpConfig {
@@ -50,6 +51,10 @@ impl SyncDhcpConfig {
 
     pub fn default_dns_servers(&self) -> &[Ipv4Addr] {
         self.default_dns_servers.as_ref()
+    }
+
+    pub fn default_failover_relation(&self) -> Option<&String> {
+        self.default_failover_relation.as_ref()
     }
 }
 

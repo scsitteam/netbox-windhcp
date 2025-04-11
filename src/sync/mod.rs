@@ -171,6 +171,26 @@ impl Sync {
             info!("  Subnet {}: Updated dns to {:?}", &subnetaddress, dns);
         }
 
+        /* Failover */
+        let expected_failover = prefix.failover_relation()
+            .or_else(|| self.config.dhcp.default_failover_relation());
+        let failover = subnet.get_failover_relationship().unwrap();
+
+        if failover != expected_failover.cloned() {
+            if failover.is_some() {
+                info!("   Remove from Failover Relation: {:?}", failover);
+                if !self.noop {
+                    subnet.remove_failover_relationship(&failover.unwrap());
+                }
+            }
+            if expected_failover.is_some() {
+                info!("   Add to Failover Relation: {:?}", expected_failover); 
+                if !self.noop {
+                    subnet.add_failover_relationship(expected_failover.unwrap());
+                }
+            }
+        }
+
         Ok(subnet)
     }
 
