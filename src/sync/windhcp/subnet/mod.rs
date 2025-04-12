@@ -317,7 +317,7 @@ impl Subnet {
     }
 
     pub fn add_failover_relationship(&self, name: &str) -> Result<(), u32> {
-        let mut name: Vec<u16> = name.encode_utf16().chain([0u16]).collect::<Vec<u16>>();
+        let name: Vec<u16> = name.encode_utf16().chain([0u16]).collect::<Vec<u16>>();
 
         let prelationship = DHCP_FAILOVER_RELATIONSHIP {
             PrimaryServer: 0,
@@ -354,7 +354,7 @@ impl Subnet {
     }
 
     pub fn remove_failover_relationship(&self, name: &str) -> Result<(), u32> {
-        let mut name: Vec<u16> = name.encode_utf16().chain([0u16]).collect::<Vec<u16>>();
+        let name: Vec<u16> = name.encode_utf16().chain([0u16]).collect::<Vec<u16>>();
 
         let prelationship = DHCP_FAILOVER_RELATIONSHIP {
             PrimaryServer: 0,

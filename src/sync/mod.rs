@@ -180,13 +180,17 @@ impl Sync {
             if failover.is_some() {
                 info!("   Remove from Failover Relation: {:?}", failover);
                 if !self.noop {
-                    subnet.remove_failover_relationship(&failover.unwrap());
+                    if let Err(e) = subnet.remove_failover_relationship(&failover.unwrap()) {
+                        warn!("Removing {} from {} faild with error code: {}", subnet.subnet_mask, expected_failover.unwrap(), e)
+                    }
                 }
             }
             if expected_failover.is_some() {
                 info!("   Add to Failover Relation: {:?}", expected_failover); 
                 if !self.noop {
-                    subnet.add_failover_relationship(expected_failover.unwrap());
+                    if let Err(e) = subnet.add_failover_relationship(expected_failover.unwrap()) {
+                        warn!("Adding {} to {} faild with error code: {}", subnet.subnet_mask, expected_failover.unwrap(), e)
+                    }
                 }
             }
         }
