@@ -97,6 +97,13 @@ impl WinDhcp {
         }
     }
 
+    pub fn get_subnet(
+        &self,
+        subnetaddress: &Ipv4Addr,
+    ) -> Result<Option<Subnet>, u32> {
+        Subnet::get(&self.serveripaddress, subnetaddress)
+    }
+
     pub fn remove_subnet(&self, subnetaddress: Ipv4Addr) -> WinDhcpResult<()> {
         match unsafe {
             DhcpDeleteSubnet(
