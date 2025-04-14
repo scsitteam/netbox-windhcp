@@ -299,6 +299,96 @@ impl Subnet {
         let net = Ipv4Net::with_netmask(Ipv4Addr::from(self.subnetaddress), self.subnet_mask).expect("Unable to create net");
         net.broadcast().into()
     }
+
+    pub fn get_failover_relationship(&self) -> Result<Option<String>, u32> {
+        let mut prelationship: *mut DHCP_FAILOVER_RELATIONSHIP = ptr::null_mut();
+
+        match unsafe {
+            trace!("Call DhcpV4FailoverGetScopeRelationship({}, {}, ptr)", &self.serveripaddress, self.subnetaddress);
+            DhcpV4FailoverGetScopeRelationship(&self.serveripaddress, self.subnetaddress, &mut prelationship)
+        } {
+            0 => {
+                let name : String = unsafe{(*prelationship).RelationshipName.to_string().unwrap()};
+                Ok(Some(name))
+            },
+            ERROR_DHCP_FO_SCOPE_NOT_IN_RELATIONSHIP => Ok(None),
+            n => Err(n),
+        }
+    }
+
+    pub fn add_failover_relationship(&self, name: &str) -> Result<(), u32> {
+        let name: Vec<u16> = name.encode_utf16().chain([0u16]).collect::<Vec<u16>>();
+
+        let prelationship = DHCP_FAILOVER_RELATIONSHIP {
+            PrimaryServer: 0,
+            SecondaryServer: 0,
+            Mode: windows::Win32::NetworkManagement::Dhcp::DHCP_FAILOVER_MODE(0),
+            ServerType: windows::Win32::NetworkManagement::Dhcp::DHCP_FAILOVER_SERVER(0),
+            State: windows::Win32::NetworkManagement::Dhcp::FSM_STATE(0),
+            PrevState: windows::Win32::NetworkManagement::Dhcp::FSM_STATE(0),
+            Mclt: 0,
+            SafePeriod: 0,
+            RelationshipName: PWSTR::from_raw(name.as_ptr() as *mut _),
+            PrimaryServerName: PWSTR::null(),
+            SecondaryServerName: PWSTR::null(),
+            pScopes: &mut DHCP_IP_ARRAY {
+                NumElements: 1,
+                Elements: &mut self.subnetaddress.clone(),
+            },
+            Percentage: 0,
+            SharedSecret: PWSTR::null(),
+        };
+
+        match unsafe {
+            trace!("Call DhcpV4FailoverAddScopeToRelationship({}, {:?})", &self.serveripaddress, prelationship);
+            DhcpV4FailoverAddScopeToRelationship(
+                &self.serveripaddress,
+                &prelationship
+            )
+        } {
+            0 => {
+                Ok(())
+            },
+            n => Err(n),
+        }
+    }
+
+    pub fn remove_failover_relationship(&self, name: &str) -> Result<(), u32> {
+        let name: Vec<u16> = name.encode_utf16().chain([0u16]).collect::<Vec<u16>>();
+
+        let prelationship = DHCP_FAILOVER_RELATIONSHIP {
+            PrimaryServer: 0,
+            SecondaryServer: 0,
+            Mode: windows::Win32::NetworkManagement::Dhcp::DHCP_FAILOVER_MODE(0),
+            ServerType: windows::Win32::NetworkManagement::Dhcp::DHCP_FAILOVER_SERVER(0),
+            State: windows::Win32::NetworkManagement::Dhcp::FSM_STATE(0),
+            PrevState: windows::Win32::NetworkManagement::Dhcp::FSM_STATE(0),
+            Mclt: 0,
+            SafePeriod: 0,
+            RelationshipName: PWSTR::from_raw(name.as_ptr() as *mut _),
+            PrimaryServerName: PWSTR::null(),
+            SecondaryServerName: PWSTR::null(),
+            pScopes: &mut DHCP_IP_ARRAY {
+                NumElements: 1,
+                Elements: &mut self.subnetaddress.clone(),
+            },
+            Percentage: 0,
+            SharedSecret: PWSTR::null(),
+        };
+
+        match unsafe {
+            trace!("Call DhcpV4FailoverDeleteScopeFromRelationship({}, {:?})", &self.serveripaddress, prelationship);
+            DhcpV4FailoverDeleteScopeFromRelationship(
+                &self.serveripaddress,
+                &prelationship
+            )
+        } {
+            0 => {
+                Ok(())
+            },
+            n => Err(n),
+        }
+    }
 }
 
 #[derive(Debug, Default, Deserialize, Clone, PartialEq, Eq)]

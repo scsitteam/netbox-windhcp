@@ -50,6 +50,10 @@ impl Prefix {
             .map(|dns| dns.iter().map(|n| n.address.addr())
             .collect::<Vec<Ipv4Addr>>())
     }
+
+    pub fn failover_relation(&self) -> Option<&String> {
+        self.custom_fields.dhcp_failover_relation.as_ref()
+    }
 }
 
 #[derive(Debug, Deserialize)]
@@ -59,6 +63,7 @@ struct PrefixCustomField {
     dhcp_routers: Option<Vec<PrefixCustomFieldIp>>,
     dhcp_dns_domain: Option<String>,
     dhcp_dns_servers: Option<Vec<PrefixCustomFieldIp>>,
+    dhcp_failover_relation: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
