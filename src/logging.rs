@@ -99,7 +99,7 @@ mod tests {
 
     #[test]
     fn it_parses_log_config() {
-        let cfg = serde_yaml::from_str::<LogConfig>(r#"---
+        let cfg = serde_yaml_ng::from_str::<LogConfig>(r#"---
         level: Debug
         dir: C:\tmp\
         "#);
@@ -112,7 +112,7 @@ mod tests {
 
     #[test]
     fn it_parses_log_config_without_dir() {
-        let cfg = serde_yaml::from_str::<LogConfig>(r#"---
+        let cfg = serde_yaml_ng::from_str::<LogConfig>(r#"---
         level: Debug
         "#);
         dbg!(&cfg);
@@ -124,7 +124,7 @@ mod tests {
 
     #[test]
     fn as_to_lof4rs_config() {
-        let cfg = serde_yaml::from_str::<LogConfig>(r#"---
+        let cfg = serde_yaml_ng::from_str::<LogConfig>(r#"---
         level: Debug
         dir: C:\tmp\
         "#).unwrap();
@@ -136,7 +136,7 @@ mod tests {
 
     #[test]
     fn as_to_lof4rs_config_without_dir() {
-        let cfg = serde_yaml::from_str::<LogConfig>(r#"---
+        let cfg = serde_yaml_ng::from_str::<LogConfig>(r#"---
         level: Debug
         "#).unwrap();
         let cfg = cfg.as_log4rs_config("test");

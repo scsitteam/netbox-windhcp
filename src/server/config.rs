@@ -63,7 +63,7 @@ mod tests {
 
     #[test]
     fn it_parses_with_only_listen() {
-        let cfg = serde_yaml::from_str::<WebhookConfig>(r#"---
+        let cfg = serde_yaml_ng::from_str::<WebhookConfig>(r#"---
         listen: 127.0.0.1:12345
         "#);
         assert_eq!(cfg.unwrap(), WebhookConfig {
@@ -74,7 +74,7 @@ mod tests {
 
     #[test]
     fn it_parses_with_all_options() {
-        let cfg = serde_yaml::from_str::<WebhookConfig>(r#"---
+        let cfg = serde_yaml_ng::from_str::<WebhookConfig>(r#"---
         listen: 127.0.0.1:12345
         sync_interval: 42
         sync_standoff_time: 42

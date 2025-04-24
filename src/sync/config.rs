@@ -69,7 +69,7 @@ mod tests {
 
     #[test]
     fn it_parses_dhcp_config() {
-        let cfg = serde_yaml::from_str::<SyncDhcpConfig>(r#"---
+        let cfg = serde_yaml_ng::from_str::<SyncDhcpConfig>(r#"---
         server: dhcp.example.com
         lease_duration: 3600
         default_dns_flags:
@@ -85,7 +85,7 @@ mod tests {
 
     #[test]
     fn it_parses_dhcp_config_without_lease_duration() {
-        let cfg = serde_yaml::from_str::<SyncDhcpConfig>(r#"---
+        let cfg = serde_yaml_ng::from_str::<SyncDhcpConfig>(r#"---
         server: dhcp.example.com
         "#);
         dbg!(&cfg);
