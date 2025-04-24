@@ -81,7 +81,7 @@ mod tests {
 
     #[test]
     fn it_parses_netbox_config() {
-        let cfg = serde_yaml::from_str::<SyncNetboxConfig>(r#"---
+        let cfg = serde_yaml_ng::from_str::<SyncNetboxConfig>(r#"---
         apiurl: https://netbox.example.com/api/
         token: SECRET
         prefix_filter:
@@ -105,7 +105,7 @@ mod tests {
 
     #[test]
     fn it_parses_minimal_netbox_config() {
-        let cfg = serde_yaml::from_str::<SyncNetboxConfig>(r#"---
+        let cfg = serde_yaml_ng::from_str::<SyncNetboxConfig>(r#"---
         apiurl: https://netbox.example.com/api/
         token: SECRET
         "#);
