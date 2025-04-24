@@ -7,7 +7,10 @@ use ipnet::Ipv4Net;
 use log::debug;
 use serde::Deserialize;
 use serde_json::json;
-use ureq::{Request, MiddlewareNext, Response, Error};
+use ureq::http::{HeaderValue, Request};
+use ureq::tls::{RootCerts, TlsConfig};
+use ureq::{Agent, Body, SendBody};
+use ureq::{middleware::MiddlewareNext, http::response::Response, Error};
 
 pub mod config;
 use self::config::SyncNetboxConfig;
@@ -30,12 +33,19 @@ impl NetboxApi {
 
         let auth_value = format!("Token {}", config.token());
 
-        let client = ureq::AgentBuilder::new()
+        let client = Agent::config_builder()
+            .tls_config(
+                TlsConfig::builder()
+                    .root_certs(RootCerts::PlatformVerifier)
+                    .build()
+            )
             .user_agent(concat!(env!("CARGO_PKG_NAME"), "/", env!("CARGO_PKG_VERSION")))
-            .middleware(move |req: Request, next: MiddlewareNext| -> Result<Response, Error> {
-                next.handle(req.set("Authorization", auth_value.as_str()))
+            .middleware(move |mut req: Request<SendBody>, next: MiddlewareNext| -> Result<Response<Body>, Error> {
+                req.headers_mut().append("Authorization", HeaderValue::from_str(auth_value.as_str()).unwrap());
+                next.handle(req)
             })
-            .build();
+            .build()
+            .into();
 
         Self { config, client }
     }
@@ -53,7 +63,8 @@ impl NetboxApi {
 
         let status: NetboxStatus = self.client.get(&url)
             .call()?
-            .into_json()?;
+            .body_mut()
+            .read_json()?;
 
         Ok(status.netbox_version)
     }
@@ -86,8 +97,8 @@ impl NetboxApi {
         });
 
         self.client.patch(ip.url())
-            .set("Content-Type", "application/json")
-            .send_string(payload.to_string().as_str())?;
+            .header("Content-Type", "application/json")
+            .send(payload.to_string().as_str())?;
 
         Ok(())
     }
@@ -108,7 +119,8 @@ impl NetboxApi {
         let mut page: Pageination<T> = self.client.get(&url)
             .query_pairs(query)
             .call()?
-            .into_json()?;
+            .body_mut()
+            .read_json()?;
 
         let mut objects: Vec<T> = Vec::with_capacity(page.count);
 
@@ -120,7 +132,8 @@ impl NetboxApi {
                     debug!("Fetch next page from {:?}", u);
                     page = self.client.get(u)
                         .call()?
-                        .into_json()?;
+                        .body_mut()
+                        .read_json()?;
                 }
                 None => { break; }
             }
@@ -133,7 +146,8 @@ impl NetboxApi {
         debug!("Fetch {} from {:?}", std::any::type_name::<T>(), url);
         let object: T = self.client.get(url)
             .call()?
-            .into_json()?;
+            .body_mut()
+            .read_json()?;
         Ok(object)
     }
 }

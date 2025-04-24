@@ -1,10 +1,9 @@
 use std::{convert::Infallible, fmt::Debug, ops::Deref};
 
-use hyper::StatusCode;
 use log::{debug, warn};
 use serde::Serialize;
 use tokio::sync::broadcast;
-use warp::{hyper::Uri, reject::Reject, Filter};
+use warp::{hyper::Uri, reject::Reject, Filter, http::StatusCode};
 use hmac::{Hmac, Mac};
 use sha2::Sha512;
 type HmacSha512 = Hmac<Sha512>;
