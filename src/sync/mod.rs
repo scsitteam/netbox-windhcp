@@ -84,6 +84,17 @@ impl Sync {
             if prefixes_ip.contains(&subnet) {
                 continue;
             }
+
+            let dhcp_subnet = self.dhcp.get_subnet(&subnet).unwrap().unwrap();
+            let failover = dhcp_subnet.get_failover_relationship().unwrap();
+            if let Some(failover) = failover {
+                info!("Subnet {}: Remove from Failover Relation: {:?}", &subnet, &failover);
+                if !self.noop {
+                    if let Err(e) = dhcp_subnet.remove_failover_relationship(&failover) {
+                        warn!("Removing {} from {} faild with error code: {}", dhcp_subnet.subnet_mask, &failover, e)
+                    }
+                }
+            }       
             
             if !self.noop { self.dhcp.remove_subnet(subnet)?; }
             info!("Subnet {}: Removed", &subnet);
@@ -169,6 +180,31 @@ impl Sync {
         if dns != subnet.get_dns_servers()? {
             if !self.noop { subnet.set_dns_servers(&dns)?; }
             info!("  Subnet {}: Updated dns to {:?}", &subnetaddress, dns);
+        }
+
+        /* Failover */
+        let expected_failover = prefix.failover_relation()
+            .or_else(|| self.config.dhcp.default_failover_relation());
+        let failover = subnet.get_failover_relationship().unwrap();
+
+        if failover != expected_failover.cloned() {
+            
+            if let Some(failover) = failover {
+                info!("   Remove from Failover Relation: {:?}", &failover);
+                if !self.noop {
+                    if let Err(e) = subnet.remove_failover_relationship(&failover) {
+                        warn!("Removing {} from {} faild with error code: {}", subnet.subnet_mask, &failover, e)
+                    }
+                }
+            }
+            if let Some(expected_failover) = expected_failover {
+                info!("   Add to Failover Relation: {:?}", &expected_failover); 
+                if !self.noop {
+                    if let Err(e) = subnet.add_failover_relationship(&expected_failover) {
+                        warn!("Adding {} to {} faild with error code: {}", subnet.subnet_mask, &expected_failover, e)
+                    }
+                }
+            }
         }
 
         Ok(subnet)

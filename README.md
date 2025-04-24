@@ -12,9 +12,11 @@ IP-Addresses matching the filter within a Prefix will be set as reservations.
 ### Per Prefix/Subnet lease duration
 To set the Prefix/Subnet DHCP lease duration a Integer Custom Field `dhcp_lease_duration` on the Ipam>Prefix can be added to override the default lease duration on a per Prefix/Subnet basis.
 
-
 ### Per Prefix/Subnet DNS Update configuration
 To set the Prefix/Subnet DNS settings a Multiple selection Custom Field `dhcp_dns_flags` with the choises `['enabled', 'update_downlevel', 'cleanup_expired', 'update_both_always', 'update_dhcid', 'disable_ptr_update', 'disabled']` on the Ipam>Prefix can be added to override the default on a per Prefix/Subnet basis.
+
+### Per Prefix/Subnet DHCP Failover configuration
+To assign the Prefix/Subnet to a Failover relation the Custom Field `dhcp_failover_relation` as a text field in the Ipam>Prefix can be added to override the default on a per Prefix/Subnet basis.
 
 ### Reservations without Device
 To make a reservation without a Device to assigne the IP-Address to a Text Custom Field `dhcp_reservation_mac` can be added to provide the MAC address.
@@ -34,10 +36,16 @@ webhook:
 sync:
     dhcp:
         server: dhcp.example.com
+        # lease_duration: 691200
+        # default_dns_domain: example.com
+        # default_dns_servers:
+        #     - 192.168.0.1
+        #     - 192.168.0.2
         default_dns_flags:
             enabled: true
             cleanup_expired: true
             update_dhcid: true
+        #default_failover_relation: DHCP-Failover
     netbox:
         apiurl: https://netbox.example.ch/api/
         token: XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
