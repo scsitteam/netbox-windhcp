@@ -32,7 +32,7 @@ fn main() {
 
     let mut last_lease = HashMap::new();
 
-    for file in glob("logs\\DhcpSrvLog-*.log").expect("Failed to read glob pattern") {
+    for file in glob(&pattern).expect("Failed to read glob pattern") {
         match file {
             Ok(filename) => {
                 debug!("Parse Logfile: {:?}", filename.display());
