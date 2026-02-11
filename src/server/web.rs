@@ -184,7 +184,7 @@ mod tests {
     const PAYLOAD: &str = r#"{
         "event": "created",
         "timestamp": "2021-03-09 17:55:33+00:00",
-        "model": "prefix",
+        "object_type": "ipam.prefix",
         "username": "jstretch",
         "request_id": "fdbca812-3142-4783-b364-2e2bd5c16c6a",
         "data": {},
@@ -238,14 +238,14 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn netbox_webhook_body_rejects_w_valid_signature() {
+    async fn netbox_webhook_body_accepts_w_valid_signature() {
         let filter = netbox_webhook_body(Some(String::from("SECRET")));
 
         // Execute `sum` and get the `Extract` back.
         let res = warp::test::request()
             .method("POST")
             .path("/webhook")
-            .header("X-Hook-Signature", "5ccf9ac371fafa61922c0c5bfbfe6882542eac8ae1b8c26ccf13a3a46108859026cc804c2b211c63c8f9918f9f79f85bbd4fc1f300fc623789264e7650e9d6f2")
+            .header("X-Hook-Signature", "06cf96543a62c0f0ef37580bd21b9447853c77be02413386c5a358355ba67b6261c8b4d0b01a37734f2c4a05bc7c7fd42f358af2d82c49e4635cdb0359e18a90")
             .body(PAYLOAD)
             .filter(&filter)
             .await
@@ -254,7 +254,7 @@ mod tests {
         assert_eq!(res, NetboxWebHook{
             event: NetboxWebHookEvent::Created,
             timestamp: Utc.with_ymd_and_hms(2021, 3, 9, 17, 55, 33).unwrap(),
-            model: String::from("prefix"),
+            object_type: String::from("ipam.prefix"),
             username: String::from("jstretch"),
             request_id: String::from("fdbca812-3142-4783-b364-2e2bd5c16c6a"),
             data: serde_json::Map::new() });

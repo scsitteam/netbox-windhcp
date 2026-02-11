@@ -5,7 +5,7 @@ use serde::Deserialize;
 pub struct NetboxWebHook {
     pub event: NetboxWebHookEvent,
     pub timestamp: DateTime<Utc>,
-    pub model: String,
+    pub object_type: String,
     pub username: String,
     pub request_id: String,
     pub data: serde_json::Map<String, serde_json::Value>,
