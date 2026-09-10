@@ -12,11 +12,11 @@ use crate::sync::windhcp::{WinDhcpError, WinDhcpResult};
 use super::Subnet;
 
 pub trait SubnetOptions<T> {
-    fn get_options(&self, optionid: u32) -> WinDhcpResult<Vec<T>>;
-    fn set_options(&self, optionid: u32, values: &[T]) -> WinDhcpResult<()>;
+    fn get_options(&self, optionid: u32) -> WinDhcpResult<'_, Vec<T>>;
+    fn set_options(&self, optionid: u32, values: &[T]) -> WinDhcpResult<'_, ()>;
 }
 pub trait SubnetOption<T: Clone>: SubnetOptions<T> {
-    fn get_option(&self, optionid: u32) -> WinDhcpResult<Option<T>> {
+    fn get_option(&self, optionid: u32) -> WinDhcpResult<'_, Option<T>> {
         let mut values: Vec<T> = self.get_options(optionid)?;
         match values.len() {
             0 => Ok(None),
@@ -25,7 +25,7 @@ pub trait SubnetOption<T: Clone>: SubnetOptions<T> {
         }
     }
 
-    fn set_option(&self, optionid: u32, value: Option<&T>) -> WinDhcpResult<()> {
+    fn set_option(&self, optionid: u32, value: Option<&T>) -> WinDhcpResult<'_, ()> {
         match value {
             Some(value) => {
                 self.set_options(optionid, &[value.clone()])
@@ -37,7 +37,7 @@ pub trait SubnetOption<T: Clone>: SubnetOptions<T> {
 
 impl SubnetOption<u32> for Subnet {}
 impl SubnetOptions<u32> for Subnet {
-    fn get_options(&self, optionid: u32) -> WinDhcpResult<Vec<u32>> {
+    fn get_options(&self, optionid: u32) -> WinDhcpResult<'_, Vec<u32>> {
         let mut optionvalue: *mut DHCP_OPTION_VALUE = ptr::null_mut();
 
         let mut scopeinfo = DHCP_OPTION_SCOPE_INFO {
@@ -79,7 +79,7 @@ impl SubnetOptions<u32> for Subnet {
         Ok(values)
     }
 
-    fn set_options(&self, optionid: u32, set_values: &[u32]) -> WinDhcpResult<()> {
+    fn set_options(&self, optionid: u32, set_values: &[u32]) -> WinDhcpResult<'_, ()> {
         if set_values.is_empty() {
             return self.remove_option(optionid).map_err(|e|
                 WinDhcpError::new("removing option", e)
@@ -123,7 +123,7 @@ impl SubnetOptions<u32> for Subnet {
 }
 
 impl SubnetOptions<Ipv4Addr> for Subnet {
-    fn get_options(&self, optionid: u32) -> WinDhcpResult<Vec<Ipv4Addr>> {
+    fn get_options(&self, optionid: u32) -> WinDhcpResult<'_, Vec<Ipv4Addr>> {
         let mut optionvalue: *mut DHCP_OPTION_VALUE = ptr::null_mut();
 
         let mut scopeinfo = DHCP_OPTION_SCOPE_INFO {
@@ -163,7 +163,7 @@ impl SubnetOptions<Ipv4Addr> for Subnet {
         Ok(ips)
     }
 
-    fn set_options(&self, optionid: u32, set_values: &[Ipv4Addr]) -> WinDhcpResult<()> {
+    fn set_options(&self, optionid: u32, set_values: &[Ipv4Addr]) -> WinDhcpResult<'_, ()> {
         if set_values.is_empty() {
             return self.remove_option(optionid).map_err(|e|
                 WinDhcpError::new("removing option", e)
@@ -208,7 +208,7 @@ impl SubnetOptions<Ipv4Addr> for Subnet {
 
 impl SubnetOption<String> for Subnet {}
 impl SubnetOptions<String> for Subnet {
-    fn get_options(&self, optionid: u32) -> WinDhcpResult<Vec<String>> {
+    fn get_options(&self, optionid: u32) -> WinDhcpResult<'_, Vec<String>> {
         let mut optionvalue: *mut DHCP_OPTION_VALUE = ptr::null_mut();
 
         let mut scopeinfo = DHCP_OPTION_SCOPE_INFO {
@@ -250,7 +250,7 @@ impl SubnetOptions<String> for Subnet {
         Ok(strings)
     }
 
-    fn set_options(&self, optionid: u32, set_values: &[String]) -> WinDhcpResult<()> {
+    fn set_options(&self, optionid: u32, set_values: &[String]) -> WinDhcpResult<'_, ()> {
         if set_values.is_empty() {
             return self.remove_option(optionid).map_err(|e|
                 WinDhcpError::new("removing option", e)
