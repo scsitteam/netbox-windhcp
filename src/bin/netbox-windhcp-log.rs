@@ -81,8 +81,15 @@ fn main() {
                     Err(e) => error!(" Reservation {}: Updating last used. {}", addr, e),
                 }
             },
-            (Some(_), _) => {
-                debug!("{:?} no lease action found", addr);
+            (Some(_), Some(_)) => {
+                debug!("{:?} no new lease action found", addr);
+            },
+            (Some(dhcp_date), None) => {
+                info!("{:?} set dhcp_reservation_last_active to {}", addr, dhcp_date);
+                match api.set_ip_last_active(&ip, dhcp_date) {
+                    Ok(_) => info!("{:?} update dhcp_reservation_last_active to {}", addr, dhcp_date),
+                    Err(e) => error!(" Reservation {}: Updating last used. {}", addr, e),
+                }
             },
         }
     }
