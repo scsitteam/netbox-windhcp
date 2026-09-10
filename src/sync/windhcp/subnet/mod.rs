@@ -123,7 +123,7 @@ impl Subnet {
         }
     }
 
-    pub fn set_mask(&self, subnetmask: Ipv4Addr) -> WinDhcpResult<()> {
+    pub fn set_mask(&self, subnetmask: Ipv4Addr) -> WinDhcpResult<'_, ()> {
         let mut subnetinfo = self.get_subnet_info()
             .map_err(|e| WinDhcpError::new("setting subnet mask", e))?;
 
@@ -133,7 +133,7 @@ impl Subnet {
         Ok(())
     }
 
-    pub fn set_name(&self, name: &str) -> WinDhcpResult<()> {
+    pub fn set_name(&self, name: &str) -> WinDhcpResult<'_, ()> {
         let mut subnetinfo = self.get_subnet_info()
             .map_err(|e| WinDhcpError::new("setting subnet name", e))?;
 
@@ -144,7 +144,7 @@ impl Subnet {
             .map_err(|e| WinDhcpError::new("setting subnet name", e))
     }
 
-    pub fn set_comment(&self, comment: &str) -> WinDhcpResult<()> {
+    pub fn set_comment(&self, comment: &str) -> WinDhcpResult<'_, ()> {
         let mut subnetinfo = self.get_subnet_info()
         .map_err(|e| WinDhcpError::new("setting subnet comment", e))?;
 
@@ -154,7 +154,7 @@ impl Subnet {
             .map_err(|e| WinDhcpError::new("setting subnet comment", e))
     }
 
-    pub fn get_subnet_range(&self) -> WinDhcpResult<(Ipv4Addr, Ipv4Addr)> {
+    pub fn get_subnet_range(&self) -> WinDhcpResult<'_, (Ipv4Addr, Ipv4Addr)> {
         match SubnetElements::<DHCP_BOOTP_IP_RANGE>::get_first_element(self) {
             Ok(Some(range)) => Ok((Ipv4Addr::from(range.StartAddress), Ipv4Addr::from(range.EndAddress))),
             Ok(None) => Ok((Ipv4Addr::from(0), Ipv4Addr::from(0))),
@@ -166,7 +166,7 @@ impl Subnet {
         &self,
         start_address: Ipv4Addr,
         end_address: Ipv4Addr,
-    ) -> WinDhcpResult<()> {
+    ) -> WinDhcpResult<'_, ()> {
         let start_address = u32::from(start_address);
         let end_address = u32::from(end_address);
 
@@ -207,44 +207,44 @@ impl Subnet {
         Ok(())
     }
 
-    pub fn get_lease_duration(&self) -> WinDhcpResult<Option<u32>> {
+    pub fn get_lease_duration(&self) -> WinDhcpResult<'_, Option<u32>> {
         self.get_option(OPTION_LEASE_TIME)
     }
 
-    pub fn set_lease_duration(&self, lease_duration: Option<u32>) -> WinDhcpResult<()> {
+    pub fn set_lease_duration(&self, lease_duration: Option<u32>) -> WinDhcpResult<'_, ()> {
         self.set_option(OPTION_LEASE_TIME, lease_duration.as_ref())
     }
 
-    pub fn get_dns_flags(&self) -> WinDhcpResult<Option<DnsFlags>> {
+    pub fn get_dns_flags(&self) -> WinDhcpResult<'_, Option<DnsFlags>> {
         #[allow(clippy::redundant_closure)]
         Ok(self.get_option(81)?.map(|f: u32| DnsFlags::from(f)))
     }
 
-    pub fn set_dns_flags(&self, dns_flags: Option<&DnsFlags>) -> WinDhcpResult<()> {
+    pub fn set_dns_flags(&self, dns_flags: Option<&DnsFlags>) -> WinDhcpResult<'_, ()> {
         self.set_option(81, dns_flags.map(u32::from).as_ref())
     }
 
-    pub fn get_routers(&self) -> WinDhcpResult<Vec<Ipv4Addr>> {
+    pub fn get_routers(&self) -> WinDhcpResult<'_, Vec<Ipv4Addr>> {
         self.get_options(OPTION_ROUTER_ADDRESS)
     }
 
-    pub fn set_routers(&self, routers: &[Ipv4Addr]) -> WinDhcpResult<()> {
+    pub fn set_routers(&self, routers: &[Ipv4Addr]) -> WinDhcpResult<'_, ()> {
         self.set_options(OPTION_ROUTER_ADDRESS, routers)
     }
 
-    pub fn get_dns_domain(&self) -> WinDhcpResult<Option<String>> {
+    pub fn get_dns_domain(&self) -> WinDhcpResult<'_, Option<String>> {
         self.get_option(OPTION_DOMAIN_NAME)
     }
 
-    pub fn set_dns_domain(&self, domain: Option<&String>) -> WinDhcpResult<()> {
+    pub fn set_dns_domain(&self, domain: Option<&String>) -> WinDhcpResult<'_, ()> {
         self.set_option(OPTION_DOMAIN_NAME, domain)
     }
 
-    pub fn get_dns_servers(&self) -> WinDhcpResult<Vec<Ipv4Addr>> {
+    pub fn get_dns_servers(&self) -> WinDhcpResult<'_, Vec<Ipv4Addr>> {
         self.get_options(OPTION_DOMAIN_NAME_SERVERS)
     }
 
-    pub fn set_dns_servers(&self, servers: &[Ipv4Addr]) -> WinDhcpResult<()> {
+    pub fn set_dns_servers(&self, servers: &[Ipv4Addr]) -> WinDhcpResult<'_, ()> {
         self.set_options(OPTION_DOMAIN_NAME_SERVERS, servers)
     }
 
@@ -266,7 +266,7 @@ impl Subnet {
         &self,
         reservationaddress: Ipv4Addr,
         macaddress: &[u8],
-    ) -> WinDhcpResult<()> {
+    ) -> WinDhcpResult<'_, ()> {
         let mut reservation = Reservation {
             ip_address: reservationaddress,
             for_client: macaddress.to_owned(),
@@ -278,7 +278,7 @@ impl Subnet {
         }
     }
 
-    pub fn remove_reservation(&self, reservationaddress: Ipv4Addr, macaddress: &[u8]) -> WinDhcpResult<()> {
+    pub fn remove_reservation(&self, reservationaddress: Ipv4Addr, macaddress: &[u8]) -> WinDhcpResult<'_, ()> {
         let mut reservation = Reservation {
             ip_address: reservationaddress,
             for_client: macaddress.to_owned(),

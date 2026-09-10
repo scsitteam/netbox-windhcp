@@ -32,7 +32,7 @@ impl WinDhcp {
         WinDhcp { serveripaddress }
     }
 
-    pub fn get_version(&self) -> WinDhcpResult<(u32, u32)> {
+    pub fn get_version(&self) -> WinDhcpResult<'_, (u32, u32)> {
         let mut major: u32 = 0;
         let mut minor: u32 = 0;
 
@@ -42,7 +42,7 @@ impl WinDhcp {
         }
     }
 
-    pub fn get_subnets(&self) -> WinDhcpResult<Vec<Ipv4Addr>> {
+    pub fn get_subnets(&self) -> WinDhcpResult<'_, Vec<Ipv4Addr>> {
         let mut resumehandle: u32 = 0;
         let mut elementsread: u32 = 0;
         let mut elementstotal: u32 = 0;
@@ -104,7 +104,7 @@ impl WinDhcp {
         Subnet::get(&self.serveripaddress, subnetaddress)
     }
 
-    pub fn remove_subnet(&self, subnetaddress: Ipv4Addr) -> WinDhcpResult<()> {
+    pub fn remove_subnet(&self, subnetaddress: Ipv4Addr) -> WinDhcpResult<'_, ()> {
         match unsafe {
             DhcpDeleteSubnet(
                 &self.serveripaddress,
@@ -151,7 +151,7 @@ impl WinDhcp {
         Ok(name)
     }
 
-    pub fn set_client_name(&self, clientip: Ipv4Addr, name: &str) -> WinDhcpResult<()> {
+    pub fn set_client_name(&self, clientip: Ipv4Addr, name: &str) -> WinDhcpResult<'_, ()> {
         let mut clientinfo: *mut DHCP_CLIENT_INFO_V4 = ptr::null_mut();
 
         let searchinfo = DHCP_SEARCH_INFO {
@@ -220,7 +220,7 @@ impl WinDhcp {
         Ok(name)
     }
 
-    pub fn set_client_comment(&self, clientip: Ipv4Addr, comment: &str) -> WinDhcpResult<()> {
+    pub fn set_client_comment(&self, clientip: Ipv4Addr, comment: &str) -> WinDhcpResult<'_, ()> {
         let mut clientinfo: *mut DHCP_CLIENT_INFO_V4 = ptr::null_mut();
 
         let searchinfo = DHCP_SEARCH_INFO {

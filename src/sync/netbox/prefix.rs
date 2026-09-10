@@ -1,7 +1,7 @@
 use std::net::Ipv4Addr;
 
 use ipnet::Ipv4Net;
-use serde::Deserialize;
+use serde::{Deserialize, Deserializer};
 
 #[derive(Debug, Deserialize)]
 pub struct Prefix {
@@ -56,9 +56,25 @@ impl Prefix {
     }
 }
 
+fn nested_value<'a, D>(deserializer: D) -> Result<Option<Vec<String>>, D::Error>
+    where D: Deserializer<'a>
+{
+    #[derive(Deserialize)]
+    struct NestedValue {
+        value: String,
+    }
+    let o = Option::<Vec<NestedValue>>::deserialize(deserializer)?;
+    
+    match o {
+        Some(list) => Ok(Some(list.iter().map(|s| s.value.clone()).collect::<Vec<String>>())),
+        None => Ok(None),
+    }
+}
+
 #[derive(Debug, Deserialize)]
 struct PrefixCustomField {
     dhcp_lease_duration: Option<u32>,
+    #[serde(default, deserialize_with = "nested_value")]
     dhcp_dns_flags: Option<Vec<String>>,
     dhcp_routers: Option<Vec<PrefixCustomFieldIp>>,
     dhcp_dns_domain: Option<String>,
@@ -97,7 +113,7 @@ mod tests {
             "description": "foo",
             "custom_fields": {
                 "dhcp_lease_duration": 86400,
-                "dhcp_dns_flags": ["enabled"],
+                "dhcp_dns_flags": [{"value": "enabled", "label": "Enabled"}],
                 "dhcp_routers": [
                     { "address": "10.112.130.1/24" }
                 ],
