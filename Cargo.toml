@@ -9,13 +9,14 @@ rpc_free = []
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+base16ct = "1.0.0"
 bytes = "1"
 chrono = { version = "0.4", features = ["serde"] }
 clap = { version = "4", features = ["derive"] }
 exitcode = "1.1.2"
 git-version = "0.3"
 glob = "0.3.1"
-hmac = "0.12"
+hmac = "0.13"
 hyper = "1"
 ipnet = { version = "2", features = ["serde"] }
 log = { version = "0.4", features = ["serde"] }
@@ -25,7 +26,7 @@ regex = "1"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 serde_yaml_ng = "0.10"
-sha2 = "0.10"
+sha2 = "0.11"
 tokio = { version = "1", features = ["rt", "macros", "rt-multi-thread", "signal", "process", "test-util"] }
 ureq = { version = "3", features = ["json", "platform-verifier"] }
 warp = { version = "0.3", features = ["tokio-rustls", "tls"] }

@@ -4,9 +4,10 @@ use log::{debug, warn};
 use serde::Serialize;
 use tokio::sync::broadcast;
 use warp::{hyper::Uri, reject::Reject, Filter, http::StatusCode};
-use hmac::{Hmac, Mac};
+use hmac::{Hmac, Mac, KeyInit};
 use sha2::Sha512;
 type HmacSha512 = Hmac<Sha512>;
+use base16ct::HexDisplay;
 
 use super::{
     config::WebhookConfig,
@@ -135,7 +136,7 @@ fn netbox_webhook_body(
                         hmac.update(&body);
                         let hmac = hmac.finalize();
                         let bytes = hmac.into_bytes();
-                        if format!("{:x}", bytes) == signature {
+                        if format!("{:x}", HexDisplay(&bytes)) == signature {
                             Ok(body)
                         } else {
                             Err(warp::reject::custom(WebErrors::BadSignature))
