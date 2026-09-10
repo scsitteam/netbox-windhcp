@@ -74,7 +74,7 @@ fn nested_value<'a, D>(deserializer: D) -> Result<Option<Vec<String>>, D::Error>
 #[derive(Debug, Deserialize)]
 struct PrefixCustomField {
     dhcp_lease_duration: Option<u32>,
-    #[serde(deserialize_with = "nested_value")]
+    #[serde(default, deserialize_with = "nested_value")]
     dhcp_dns_flags: Option<Vec<String>>,
     dhcp_routers: Option<Vec<PrefixCustomFieldIp>>,
     dhcp_dns_domain: Option<String>,
@@ -113,7 +113,7 @@ mod tests {
             "description": "foo",
             "custom_fields": {
                 "dhcp_lease_duration": 86400,
-                "dhcp_dns_flags": ["enabled"],
+                "dhcp_dns_flags": [{"value": "enabled", "label": "Enabled"}],
                 "dhcp_routers": [
                     { "address": "10.112.130.1/24" }
                 ],
