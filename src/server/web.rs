@@ -206,7 +206,6 @@ mod tests {
             .await;
 
         assert!(res.is_ok());
-        assert_eq!(res.unwrap().username, "jstretch");
     }
 
     #[tokio::test]
@@ -256,8 +255,6 @@ mod tests {
             event: NetboxWebHookEvent::Created,
             timestamp: Utc.with_ymd_and_hms(2021, 3, 9, 17, 55, 33).unwrap(),
             object_type: String::from("ipam.prefix"),
-            username: String::from("jstretch"),
-            request_id: String::from("fdbca812-3142-4783-b364-2e2bd5c16c6a"),
             data: serde_json::Map::new() });
     }
 }
